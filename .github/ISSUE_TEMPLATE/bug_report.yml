@@ -1,67 +1,79 @@
-name: "💡 Feature Request"
-description: Propose a new capability, preset, or architectural improvement
-title: "[Feature]: "
-labels: ["enhancement"]
+name: "🐛 Bug Report"
+description: Report a bug or unexpected behavior in RepoPacker
+title: "[Bug]: "
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        All features in RepoPacker must align with our core goal: **helping LLMs ingest software repositories with minimal context waste and zero corruption**.
+        Thanks for filing a bug report. In accordance with our contributing guidelines, please ensure that any AI-assisted bug diagnoses or proposed patches have been physically reproduced and verified by a human on a real Windows environment.
 
   - type: textarea
-    id: problem_statement
+    id: description
     attributes:
-      label: Problem Statement
-      description: What limitation or workflow bottleneck does this feature address?
-      placeholder: Is your feature request related to a problem? (e.g., "Packing monorepos includes unwanted workspace packages...")
+      label: Bug Description
+      description: Provide a clear and concise description of what the problem is.
+      placeholder: What broke or behaved unexpectedly?
     validations:
       required: true
 
   - type: textarea
-    id: proposed_solution
+    id: reproduction
     attributes:
-      label: Proposed Solution & LLM Impact
-      description: Describe the solution and how it improves context efficiency, token usage, or model parsing.
-      placeholder: Describe the desired capability and why an LLM benefits from this output format.
-    validations:
-      required: true
-
-  - type: textarea
-    id: ai_spec
-    attributes:
-      label: AI-Generated Architecture Specification
-      description: If you generated a proposed implementation, interfaces, or presets using an LLM, provide the details here.
+      label: Steps to Reproduce
+      description: Detailed sequential steps to reproduce the behavior.
       placeholder: |
-        - Model(s) Used to Draft Spec:
-        - Proposed Classes / Interfaces:
-        - Proposed Settings / JSON Format:
+        1. Open RepoPacker
+        2. Enter repository URL '...'
+        3. Select preset '...'
+        4. Click 'Pack Repository'
+        5. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_vs_actual
+    attributes:
+      label: Expected vs. Actual Behavior
+      description: What did you expect to happen, and what actually occurred?
+      placeholder: Expected the file to pack without errors, but received exception '...'
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: System & Runtime Environment
+      description: System details where the issue occurred.
+      value: |
+        - OS: Windows 11 (or Windows 10 Version/Build: )
+        - .NET SDK / Runtime: .NET 10.0.xxx
+        - RepoPacker Version / Commit: 
+        - Repository Type: [Public / Private with PAT]
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai_diagnosis
+    attributes:
+      label: AI Diagnosis or Proposed Fix (Optional)
+      description: If you used an LLM to analyze the crash, stack trace, or codebase, paste the model's analysis and proposed code changes here.
+      placeholder: |
+        - Model Used: (e.g., Claude 3.7 Sonnet, GPT-4o, Gemini 2.5 Pro)
+        - Model Diagnosis:
+        - Proposed C# Solution:
     validations:
       required: false
 
-  - type: dropdown
-    id: affected_area
-    attributes:
-      label: Affected Subsystem
-      description: Which part of the application does this feature touch?
-      options:
-        - "Git Cloning & Traversal Engine (LibGit2Sharp)"
-        - "Tokenization & Sizing (Microsoft.ML.Tokenizers)"
-        - "Presets & Exclusions (presets.json)"
-        - "UI / Titlebar / Theming (WPF / WindowChrome)"
-        - "Security & DPAPI Credentials"
-        - "Output Digest Formatting (XML Schema)"
-    validations:
-      required: true
-
   - type: checkboxes
-    id: architectural_compliance
+    id: human_verification
     attributes:
-      label: Architectural Compliance Checklist
-      description: Confirm alignment with RepoPacker's engineering principles.
+      label: Human Review & Grounding Checks
+      description: Confirm that this issue reflects real behavior rather than synthetic hallucination.
       options:
-        - label: I understand that any accompanying PR must be predominantly AI-generated under human review.
+        - label: I have reproduced this bug manually on an actual Windows machine.
           required: true
-        - label: The proposed design avoids monolithic in-memory buffers in favor of streaming I/O.
+        - label: Any stack traces or logs provided were captured from execution, not hallucinated by an AI.
           required: true
-        - label: Any suggested C# code strictly adheres to explicit typing (no `var` keywords).
+        - label: If a fix is proposed, it adheres to our explicit typing rule (zero `var` usage) and .NET 10 standards.
           required: true
