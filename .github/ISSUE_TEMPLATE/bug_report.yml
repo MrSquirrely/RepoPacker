@@ -41,19 +41,6 @@ body:
       required: true
 
   - type: textarea
-    id: environment
-    attributes:
-      label: System & Runtime Environment
-      description: System details where the issue occurred.
-      value: |
-        - OS: Windows 11 (or Windows 10 Version/Build: )
-        - .NET SDK / Runtime: .NET 10.0.xxx
-        - RepoPacker Version / Commit: 
-        - Repository Type: [Public / Private with PAT]
-    validations:
-      required: true
-
-  - type: textarea
     id: ai_diagnosis
     attributes:
       label: AI Diagnosis or Proposed Fix (Optional)
