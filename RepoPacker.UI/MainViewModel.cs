@@ -10,115 +10,126 @@ using Microsoft.Win32;
 namespace RepoPacker.UI;
 
 public partial class MainViewModel : ObservableObject {
-    private readonly RepoPackerService packerService;
-    private CancellationTokenSource? cancellationTokenSource;
+    private readonly RepoPackerService _packerService;
+    private CancellationTokenSource? _cancellationTokenSource;
+    private bool _isInitialized;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
-    private string repositoryUrl = string.Empty;
+    private string _repositoryUrl = string.Empty;
 
     [ObservableProperty]
-    private string personalAccessToken = string.Empty;
+    private string _personalAccessToken = string.Empty;
 
     [ObservableProperty]
-    private bool rememberToken;
+    private bool _rememberToken;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
-    private string outputFilePath = string.Empty;
+    private string _outputFilePath = string.Empty;
 
     [ObservableProperty]
-    private string statusMessage = "Ready";
+    private string _statusMessage = "Ready";
 
     [ObservableProperty]
-    private int tokenCount;
+    private int _tokenCount;
 
     [ObservableProperty]
-    private string tokenCountDisplay = string.Empty;
+    private string _tokenCountDisplay = string.Empty;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotBusy))]
-    private bool isBusy;
+    private bool _isBusy;
 
     public bool IsNotBusy => !IsBusy;
 
     [ObservableProperty]
-    private bool isIndeterminate;
+    private bool _isIndeterminate;
 
     // Presets Management
     public ObservableCollection<PackingPreset> Presets { get; }
 
     [ObservableProperty]
-    private PackingPreset selectedPreset;
+    private PackingPreset _selectedPreset;
 
     [ObservableProperty]
-    private string excludedDirectoriesInput = string.Empty;
+    private string _excludedDirectoriesInput = string.Empty;
 
     [ObservableProperty]
-    private string excludedExtensionsInput = string.Empty;
+    private string _excludedExtensionsInput = string.Empty;
 
     [ObservableProperty]
-    private int maxFileSizeKb = 500;
+    private int _maxFileSizeKb = 500;
 
     // Themes Management
     public ObservableCollection<ThemeDefinition> InstalledThemes { get; }
 
     [ObservableProperty]
-    private ThemeDefinition selectedTheme;
+    private ThemeDefinition _selectedTheme;
 
     public MainViewModel() {
-        packerService = new RepoPackerService();
+        _packerService = new RepoPackerService();
 
-        // Load JSON Presets
+        // 1. Load Presets
         List<PackingPreset> loadedPresets = PresetService.LoadPresets();
         Presets = new ObservableCollection<PackingPreset>(loadedPresets);
-        selectedPreset = Presets.Count > 0 ? Presets[0] : new PackingPreset("Custom", "Custom", ".git", ".dll", true);
-        ApplyPreset(selectedPreset);
+        _selectedPreset = Presets.Count > 0 ? Presets[0] : new PackingPreset("Custom", "Custom", ".git", ".dll", true);
+        ApplyPreset(_selectedPreset);
 
-        // Load Installed Themes
+        // 2. Load Themes
         List<ThemeDefinition> loadedThemes = ThemeService.LoadInstalledThemes();
         InstalledThemes = new ObservableCollection<ThemeDefinition>(loadedThemes);
+        _selectedTheme = InstalledThemes.Count > 0 ? InstalledThemes[0] : new ThemeDefinition();
 
-        // Restore Settings
+        // 3. Load Saved Settings
         UserSettings savedSettings = SettingsService.LoadSettings();
-        RememberToken = savedSettings.RememberToken;
 
-        if (RememberToken && !string.IsNullOrWhiteSpace(savedSettings.EncryptedToken)) {
+        // Restore Theme
+        if (!string.IsNullOrWhiteSpace(savedSettings.SelectedThemeId)) {
+            ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(
+                t => t.Id.Equals(savedSettings.SelectedThemeId, StringComparison.OrdinalIgnoreCase));
+            if (matchedTheme != null) {
+                _selectedTheme = matchedTheme;
+            }
+        }
+        ThemeService.ApplyTheme(_selectedTheme);
+
+        // Restore Preset
+        if (!string.IsNullOrWhiteSpace(savedSettings.SelectedPresetName)) {
+            PackingPreset? matchedPreset = Presets.FirstOrDefault(
+                p => p.Name.Equals(savedSettings.SelectedPresetName, StringComparison.OrdinalIgnoreCase));
+            if (matchedPreset != null) {
+                _selectedPreset = matchedPreset;
+                ApplyPreset(_selectedPreset);
+            }
+        }
+
+        // Restore Token
+        _rememberToken = savedSettings.RememberToken;
+        if (_rememberToken && !string.IsNullOrWhiteSpace(savedSettings.EncryptedToken)) {
             PersonalAccessToken = SettingsService.DecryptToken(savedSettings.EncryptedToken);
         }
 
-        // Restore active theme
-        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(savedSettings.SelectedThemeId, StringComparison.OrdinalIgnoreCase));
-        selectedTheme = matchedTheme ?? InstalledThemes[0];
-        ThemeService.ApplyTheme(selectedTheme);
+        // 4. Mark initialized to enable safe persistence on subsequent user changes
+        _isInitialized = true;
+    }
 
-        // Restore active preset
-        if (string.IsNullOrWhiteSpace(savedSettings.SelectedPresetName)) {
-	        return;
-        }
-
-        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(savedSettings.SelectedPresetName, StringComparison.OrdinalIgnoreCase));
-        if (matchedPreset != null) {
-	        SelectedPreset = matchedPreset;
+    partial void OnSelectedThemeChanged(ThemeDefinition value) {
+        if (value != null) {
+            ThemeService.ApplyTheme(value);
+            PersistCurrentSettings();
         }
     }
 
-    partial void OnSelectedThemeChanged(ThemeDefinition? value) {
-	    if (value == null) {
-		    return;
-	    }
-
-	    ThemeService.ApplyTheme(value);
-	    PersistCurrentSettings();
+    partial void OnSelectedPresetChanged(PackingPreset value) {
+        if (value != null) {
+            ApplyPreset(value);
+            PersistCurrentSettings();
+        }
     }
 
-    partial void OnSelectedPresetChanged(PackingPreset? value) {
-	    if (value == null) {
-		    return;
-	    }
-
-	    ApplyPreset(value);
-	    PersistCurrentSettings();
+    partial void OnRememberTokenChanged(bool value) {
+        PersistCurrentSettings();
     }
 
     private void ApplyPreset(PackingPreset preset) {
@@ -126,9 +137,28 @@ public partial class MainViewModel : ObservableObject {
         ExcludedExtensionsInput = preset.ExcludedExtensionsText;
     }
 
+    private void PersistCurrentSettings() {
+        if (!_isInitialized) {
+            return;
+        }
+
+        UserSettings settings = new UserSettings {
+            SelectedThemeId = SelectedTheme?.Id ?? "github-dark",
+            SelectedPresetName = SelectedPreset?.Name ?? string.Empty,
+            RememberToken = RememberToken,
+            EncryptedToken = RememberToken ? SettingsService.EncryptToken(PersonalAccessToken) : string.Empty
+        };
+
+        SettingsService.SaveSettings(settings);
+    }
+
     [RelayCommand]
     private void SaveCurrentPreset() {
-	    SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
+        if (SelectedPreset == null) {
+            return;
+        }
+
+        SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
         SelectedPreset.ExcludedExtensionsText = ExcludedExtensionsInput.Trim();
         PresetService.SavePresets(Presets);
         StatusMessage = $"Saved preset '{SelectedPreset.Name}' to presets.json";
@@ -152,165 +182,6 @@ public partial class MainViewModel : ObservableObject {
     [RelayCommand]
     private void OpenThemesFolder() {
         ThemeService.OpenThemesFolder();
-    }
-
-    [RelayCommand]
-    private void ReloadThemes() {
-        List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
-        InstalledThemes.Clear();
-        foreach (ThemeDefinition theme in freshThemes) {
-            InstalledThemes.Add(theme);
-        }
-
-        ThemeDefinition? fallback = InstalledThemes.FirstOrDefault(t => t.Id == SelectedTheme.Id) ?? InstalledThemes.FirstOrDefault();
-        if (fallback != null) {
-            SelectedTheme = fallback;
-        }
-    }
-
-    // ReSharper disable once UnusedParameterInPartialMethod
-    partial void OnRememberTokenChanged(bool value) {
-        PersistCurrentSettings();
-    }
-
-    private void PersistCurrentSettings() {
-        UserSettings settings = new() {
-            SelectedThemeId = SelectedTheme.Id,
-            SelectedPresetName = SelectedPreset.Name,
-            RememberToken = RememberToken,
-            EncryptedToken = RememberToken ? SettingsService.EncryptToken(PersonalAccessToken) : string.Empty
-        };
-
-        SettingsService.SaveSettings(settings);
-    }
-
-    [RelayCommand]
-    private void BrowseOutputFile() {
-        SaveFileDialog dialog = new SaveFileDialog {
-            Title = "Select Destination LLM Context File",
-            Filter = "XML File (*.xml)|*.xml|Text File (*.txt)|*.txt|All Files (*.*)|*.*",
-            DefaultExt = ".xml",
-            FileName = "repository_context.xml"
-        };
-
-        bool? result = dialog.ShowDialog();
-        if (result == true) {
-            OutputFilePath = dialog.FileName;
-        }
-    }
-
-    private bool CanPackRepository() {
-        return !IsBusy &&
-               !string.IsNullOrWhiteSpace(RepositoryUrl) &&
-               !string.IsNullOrWhiteSpace(OutputFilePath);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanPackRepository))]
-    private async Task PackRepositoryAsync() {
-        IsBusy = true;
-        IsIndeterminate = true;
-        TokenCount = 0;
-        TokenCountDisplay = string.Empty;
-        cancellationTokenSource = new CancellationTokenSource();
-
-        if (RememberToken) {
-            PersistCurrentSettings();
-        }
-
-        IProgress<string> progressReporter = new Progress<string>(message => {
-            StatusMessage = message;
-        });
-
-        HashSet<string> excludedDirs = ParseCsvToHashSet(ExcludedDirectoriesInput);
-        excludedDirs.Add(".git");
-
-        HashSet<string> excludedExts = ParseCsvToHashSet(ExcludedExtensionsInput);
-
-        long maxFileSizeBytes = MaxFileSizeKb > 0 ? MaxFileSizeKb * 1024L : 0L;
-
-        try {
-            string destination = OutputFilePath.Trim();
-
-            await packerService.ProcessRepositoryAsync(
-                RepositoryUrl.Trim(),
-                PersonalAccessToken.Trim(),
-                destination,
-                excludedDirs,
-                excludedExts,
-                maxFileSizeBytes,
-                progressReporter,
-                cancellationTokenSource.Token);
-
-            progressReporter.Report("Calculating token count...");
-
-            int calculatedTokens = await Task.Run(
-                () => CountTokensInFile(destination, cancellationTokenSource.Token),
-                cancellationTokenSource.Token);
-
-            TokenCount = calculatedTokens;
-            TokenCountDisplay = $"{calculatedTokens:N0} tokens";
-            StatusMessage = $"Completed ({TokenCountDisplay}) — saved to: {Path.GetFileName(destination)}";
-        }
-        catch (OperationCanceledException) {
-            StatusMessage = "Operation cancelled by user.";
-            TokenCountDisplay = string.Empty;
-        }
-        catch (Exception ex) {
-            StatusMessage = $"Error: {ex.Message}";
-            TokenCountDisplay = string.Empty;
-        }
-        finally {
-            IsBusy = false;
-            IsIndeterminate = false;
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
-        }
-    }
-
-    private HashSet<string> ParseCsvToHashSet(string csv) {
-        HashSet<string> set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(csv)) {
-            return set;
-        }
-
-        string[] items = csv.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (string rawItem in items) {
-            string trimmed = rawItem.Trim();
-            if (!string.IsNullOrEmpty(trimmed)) {
-                set.Add(trimmed);
-            }
-        }
-
-        return set;
-    }
-
-    [RelayCommand]
-    private void Cancel() {
-	    if (cancellationTokenSource is not { IsCancellationRequested: false }) {
-		    return;
-	    }
-
-	    StatusMessage = "Cancelling...";
-	    cancellationTokenSource.Cancel();
-    }
-
-    private int CountTokensInFile(string filePath, CancellationToken cancellationToken) {
-        TiktokenTokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
-        int totalTokens = 0;
-        const int bufferSize = 65536;
-        char[] buffer = new char[bufferSize];
-
-        using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-        using (StreamReader reader = new StreamReader(fileStream, Encoding.UTF8)) {
-            int charsRead;
-            while ((charsRead = reader.Read(buffer, 0, buffer.Length)) > 0) {
-                cancellationToken.ThrowIfCancellationRequested();
-                ReadOnlySpan<char> chunkSpan = new ReadOnlySpan<char>(buffer, 0, charsRead);
-                totalTokens += tokenizer.CountTokens(chunkSpan);
-            }
-        }
-
-        return totalTokens;
     }
 
     [RelayCommand]
@@ -387,5 +258,132 @@ public partial class MainViewModel : ObservableObject {
                 StatusMessage = $"Import error: {ex.Message}";
             }
         }
+    }
+
+    [RelayCommand]
+    private void BrowseOutputFile() {
+        SaveFileDialog dialog = new SaveFileDialog {
+            Title = "Select Destination LLM Context File",
+            Filter = "XML File (*.xml)|*.xml|Text File (*.txt)|*.txt|All Files (*.*)|*.*",
+            DefaultExt = ".xml",
+            FileName = "repository_context.xml"
+        };
+
+        bool? result = dialog.ShowDialog();
+        if (result == true) {
+            OutputFilePath = dialog.FileName;
+        }
+    }
+
+    private bool CanPackRepository() {
+        return !IsBusy &&
+               !string.IsNullOrWhiteSpace(RepositoryUrl) &&
+               !string.IsNullOrWhiteSpace(OutputFilePath);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPackRepository))]
+    private async Task PackRepositoryAsync() {
+        IsBusy = true;
+        IsIndeterminate = true;
+        TokenCount = 0;
+        TokenCountDisplay = string.Empty;
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        if (RememberToken) {
+            PersistCurrentSettings();
+        }
+
+        IProgress<string> progressReporter = new Progress<string>(message => {
+            StatusMessage = message;
+        });
+
+        HashSet<string> excludedDirs = ParseCsvToHashSet(ExcludedDirectoriesInput);
+        excludedDirs.Add(".git");
+
+        HashSet<string> excludedExts = ParseCsvToHashSet(ExcludedExtensionsInput);
+
+        long maxFileSizeBytes = MaxFileSizeKb > 0 ? (long)MaxFileSizeKb * 1024L : 0L;
+
+        try {
+            string destination = OutputFilePath.Trim();
+
+            await _packerService.ProcessRepositoryAsync(
+                RepositoryUrl.Trim(),
+                PersonalAccessToken.Trim(),
+                destination,
+                excludedDirs,
+                excludedExts,
+                maxFileSizeBytes,
+                progressReporter,
+                _cancellationTokenSource.Token);
+
+            progressReporter.Report("Calculating token count...");
+
+            int calculatedTokens = await Task.Run(
+                () => CountTokensInFile(destination, _cancellationTokenSource.Token),
+                _cancellationTokenSource.Token);
+
+            TokenCount = calculatedTokens;
+            TokenCountDisplay = $"{calculatedTokens:N0} tokens";
+            StatusMessage = $"Completed ({TokenCountDisplay}) — saved to: {Path.GetFileName(destination)}";
+        }
+        catch (OperationCanceledException) {
+            StatusMessage = "Operation cancelled by user.";
+            TokenCountDisplay = string.Empty;
+        }
+        catch (Exception ex) {
+            StatusMessage = $"Error: {ex.Message}";
+            TokenCountDisplay = string.Empty;
+        }
+        finally {
+            IsBusy = false;
+            IsIndeterminate = false;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+        }
+    }
+
+    private HashSet<string> ParseCsvToHashSet(string csv) {
+        HashSet<string> set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv)) {
+            return set;
+        }
+
+        string[] items = csv.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (string rawItem in items) {
+            string trimmed = rawItem.Trim();
+            if (!string.IsNullOrEmpty(trimmed)) {
+                set.Add(trimmed);
+            }
+        }
+
+        return set;
+    }
+
+    [RelayCommand]
+    private void Cancel() {
+        if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested) {
+            StatusMessage = "Cancelling...";
+            _cancellationTokenSource.Cancel();
+        }
+    }
+
+    private int CountTokensInFile(string filePath, CancellationToken cancellationToken) {
+        TiktokenTokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+        int totalTokens = 0;
+        const int bufferSize = 65536;
+        char[] buffer = new char[bufferSize];
+
+        using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using (StreamReader reader = new StreamReader(fileStream, Encoding.UTF8)) {
+            int charsRead;
+            while ((charsRead = reader.Read(buffer, 0, buffer.Length)) > 0) {
+                cancellationToken.ThrowIfCancellationRequested();
+                ReadOnlySpan<char> chunkSpan = new ReadOnlySpan<char>(buffer, 0, charsRead);
+                totalTokens += tokenizer.CountTokens(chunkSpan);
+            }
+        }
+
+        return totalTokens;
     }
 }
