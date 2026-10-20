@@ -1,41 +1,27 @@
-name: "🎨 Submit UI Theme"
-description: "Share a custom color scheme matching the GitHub Primer palette"
+---
 title: "Theme: [Theme Name]"
-labels: ["theme"]
-body:
-  - type: markdown
-    attributes:
-      value: "RepoPacker will parse the JSON code block to register this theme in the client."
-  - type: textarea
-    id: description
-    attributes:
-      label: "Theme Description"
-      description: "Describe the aesthetic, contrast level, or inspiration."
-      placeholder: "High-contrast neon dark theme based on Dracula."
-    validations:
-      required: true
-  - type: textarea
-    id: json_payload
-    attributes:
-      label: "Theme JSON"
-      description: "Provide the complete ThemeDefinition JSON definition."
-      render: json
-      value: |
-        {
-          "id": "dracula-dark",
-          "displayName": "Dracula Dark",
-          "canvasColor": "#282A36",
-          "cardColor": "#21222C",
-          "titleBarColor": "#21222C",
-          "borderColor": "#6272A4",
-          "textPrimaryColor": "#F8F8F2",
-          "textSecondaryColor": "#6272A4",
-          "inputBgColor": "#191A21",
-          "btnSecondaryBgColor": "#44475A",
-          "btnSecondaryHoverColor": "#6272A4",
-          "itemHoverColor": "#44475A",
-          "itemSelectedColor": "#BD93F9",
-          "titleBtnHoverColor": "#44475A"
-        }
-    validations:
-      required: true
+---
+
+### Theme Description
+<!-- Describe the palette aesthetic, contrast level, or editor inspiration. -->
+
+### Theme Definition
+<!-- RepoPacker automatically parses the JSON block below. Keep your configuration within the code fence. -->
+
+```json
+{
+  "id": "custom-theme-id",
+  "displayName": "Custom Theme Name",
+  "canvasColor": "#0D1117",
+  "cardColor": "#161B22",
+  "titleBarColor": "#161B22",
+  "borderColor": "#30363D",
+  "textPrimaryColor": "#E6EDF3",
+  "textSecondaryColor": "#8B949E",
+  "inputBgColor": "#010409",
+  "btnSecondaryBgColor": "#21262D",
+  "btnSecondaryHoverColor": "#30363D",
+  "itemHoverColor": "#21262D",
+  "itemSelectedColor": "#1F6FEB",
+  "titleBtnHoverColor": "#30363D"
+}
