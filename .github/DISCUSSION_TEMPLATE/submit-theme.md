@@ -1,6 +1,5 @@
 ---
 title: "Theme: [Theme Name]"
-description: "Submit a theme"
 ---
 
 ### Theme Description
