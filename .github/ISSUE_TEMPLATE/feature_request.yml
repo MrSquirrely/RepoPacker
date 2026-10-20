@@ -1,0 +1,67 @@
+name: "💡 Feature Request"
+description: Propose a new capability, preset, or architectural improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        All features in RepoPacker must align with our core goal: **helping LLMs ingest software repositories with minimal context waste and zero corruption**.
+
+  - type: textarea
+    id: problem_statement
+    attributes:
+      label: Problem Statement
+      description: What limitation or workflow bottleneck does this feature address?
+      placeholder: Is your feature request related to a problem? (e.g., "Packing monorepos includes unwanted workspace packages...")
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution & LLM Impact
+      description: Describe the solution and how it improves context efficiency, token usage, or model parsing.
+      placeholder: Describe the desired capability and why an LLM benefits from this output format.
+    validations:
+      required: true
+
+  - type: textarea
+    id: ai_spec
+    attributes:
+      label: AI-Generated Architecture Specification
+      description: If you generated a proposed implementation, interfaces, or presets using an LLM, provide the details here.
+      placeholder: |
+        - Model(s) Used to Draft Spec:
+        - Proposed Classes / Interfaces:
+        - Proposed Settings / JSON Format:
+    validations:
+      required: false
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected Subsystem
+      description: Which part of the application does this feature touch?
+      options:
+        - "Git Cloning & Traversal Engine (LibGit2Sharp)"
+        - "Tokenization & Sizing (Microsoft.ML.Tokenizers)"
+        - "Presets & Exclusions (presets.json)"
+        - "UI / Titlebar / Theming (WPF / WindowChrome)"
+        - "Security & DPAPI Credentials"
+        - "Output Digest Formatting (XML Schema)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: architectural_compliance
+    attributes:
+      label: Architectural Compliance Checklist
+      description: Confirm alignment with RepoPacker's engineering principles.
+      options:
+        - label: I understand that any accompanying PR must be predominantly AI-generated under human review.
+          required: true
+        - label: The proposed design avoids monolithic in-memory buffers in favor of streaming I/O.
+          required: true
+        - label: Any suggested C# code strictly adheres to explicit typing (no `var` keywords).
+          required: true
