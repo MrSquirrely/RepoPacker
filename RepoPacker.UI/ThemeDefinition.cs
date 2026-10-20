@@ -9,6 +9,9 @@ public sealed class ThemeDefinition {
 	[JsonPropertyName("displayName")]
 	public string DisplayName { get; set; } = string.Empty;
 
+	[JsonPropertyName("isDefault")]
+	public bool IsDefault { get; set; }
+
 	[JsonPropertyName("canvasColor")]
 	public string CanvasColor { get; set; } = "#0D1117";
 

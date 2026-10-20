@@ -100,11 +100,11 @@ public sealed class MarketplaceService {
                 DateTime createdAt = node.GetProperty("createdAt").GetDateTime();
                 string discussionId = node.GetProperty("id").GetString() ?? Guid.NewGuid().ToString();
 
-                // Categorize whether the JSON payload is a Preset or a Theme
                 if (rawJson.Contains("\"excludedDirectories\"") || rawJson.Contains("\"excludedExtensions\"")) {
                     try {
                         PackingPreset? preset = JsonSerializer.Deserialize<PackingPreset>(rawJson, JsonOptions);
                         if (preset != null && !string.IsNullOrWhiteSpace(preset.Name)) {
+                            preset.IsDefault = PresetService.IsDefaultPreset(preset.Name);
                             bool isInstalled = existingPresets.Any(p => p.Name.Equals(preset.Name, StringComparison.OrdinalIgnoreCase));
                             results.Add(new MarketplaceItem {
                                 Id = discussionId,
@@ -121,13 +121,14 @@ public sealed class MarketplaceService {
                         }
                     }
                     catch {
-                        // Ignore malformed individual payloads
+                        // Ignore malformed payloads
                     }
                 }
                 else if (rawJson.Contains("\"canvasColor\"") || rawJson.Contains("\"cardColor\"")) {
                     try {
                         ThemeDefinition? theme = JsonSerializer.Deserialize<ThemeDefinition>(rawJson, JsonOptions);
                         if (theme != null && !string.IsNullOrWhiteSpace(theme.DisplayName)) {
+                            theme.IsDefault = ThemeService.IsDefaultTheme(theme.Id);
                             bool isInstalled = existingThemes.Any(t => t.Id.Equals(theme.Id, StringComparison.OrdinalIgnoreCase));
                             results.Add(new MarketplaceItem {
                                 Id = discussionId,
@@ -144,7 +145,7 @@ public sealed class MarketplaceService {
                         }
                     }
                     catch {
-                        // Ignore malformed individual payloads
+                        // Ignore malformed payloads
                     }
                 }
             }
@@ -163,5 +164,25 @@ public sealed class MarketplaceService {
             ThemeService.SaveTheme(item.ThemePayload);
             item.IsInstalled = true;
         }
+    }
+
+    public bool UninstallItem(MarketplaceItem item) {
+        if (item.IsDefaultItem) {
+            return false;
+        }
+
+        bool removed = false;
+        if (item.ItemType == MarketplaceItemType.Preset && item.PresetPayload != null) {
+            removed = PresetService.DeletePreset(item.PresetPayload.Name);
+        }
+        else if (item.ItemType == MarketplaceItemType.Theme && item.ThemePayload != null) {
+            removed = ThemeService.DeleteTheme(item.ThemePayload);
+        }
+
+        if (removed) {
+            item.IsInstalled = false;
+        }
+
+        return removed;
     }
 }

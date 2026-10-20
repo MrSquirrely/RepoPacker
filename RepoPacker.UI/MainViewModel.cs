@@ -1,7 +1,14 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,6 +19,8 @@ using Microsoft.Win32;
 namespace RepoPacker.UI;
 
 public partial class MainViewModel : ObservableObject {
+    #region Fields & Dependencies
+
     private static readonly Lazy<TiktokenTokenizer> TokenizerInstance = new Lazy<TiktokenTokenizer>(
         () => TiktokenTokenizer.CreateForModel("gpt-4o"),
         LazyThreadSafetyMode.ExecutionAndPublication);
@@ -19,6 +28,10 @@ public partial class MainViewModel : ObservableObject {
     private readonly RepoPackerService _packerService;
     private CancellationTokenSource? _cancellationTokenSource;
     private bool _isInitialized;
+
+    #endregion
+
+    #region Observable Properties - Repository & Output
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
@@ -33,6 +46,10 @@ public partial class MainViewModel : ObservableObject {
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
     private string _outputFilePath = string.Empty;
+
+    #endregion
+
+    #region Observable Properties - Execution State & Metrics
 
     [ObservableProperty]
     private string _statusMessage = "Ready";
@@ -52,7 +69,10 @@ public partial class MainViewModel : ObservableObject {
     [ObservableProperty]
     private bool _isIndeterminate;
 
-    // Presets Management
+    #endregion
+
+    #region Observable Properties - Presets & Exclusions
+
     public ObservableCollection<PackingPreset> Presets { get; }
 
     [ObservableProperty]
@@ -67,27 +87,36 @@ public partial class MainViewModel : ObservableObject {
     [ObservableProperty]
     private int _maxFileSizeKb = 500;
 
-    // Themes Management
+    #endregion
+
+    #region Observable Properties - Themes Management
+
     public ObservableCollection<ThemeDefinition> InstalledThemes { get; }
 
     [ObservableProperty]
     private ThemeDefinition _selectedTheme;
 
+    #endregion
+
+    #region Constructor & Initialization
+
     public MainViewModel() {
         _packerService = new RepoPackerService();
 
-        // 1. Load Presets
+        // 1. Load Presets from %APPDATA%\RepoPacker\Presets\
         List<PackingPreset> loadedPresets = PresetService.LoadPresets();
         Presets = new ObservableCollection<PackingPreset>(loadedPresets);
-        _selectedPreset = Presets.Count > 0 ? Presets[0] : new PackingPreset("Custom", "Custom", ".git", ".dll", true);
+        _selectedPreset = Presets.Count > 0
+            ? Presets[0]
+            : new PackingPreset("Custom", "Custom", ".git", ".dll", isCustom: true, isDefault: false);
         ApplyPreset(_selectedPreset);
 
-        // 2. Load Themes
+        // 2. Load Installed Themes from %APPDATA%\RepoPacker\Themes\
         List<ThemeDefinition> loadedThemes = ThemeService.LoadInstalledThemes();
         InstalledThemes = new ObservableCollection<ThemeDefinition>(loadedThemes);
         _selectedTheme = InstalledThemes.Count > 0 ? InstalledThemes[0] : new ThemeDefinition();
 
-        // 3. Load Saved Settings
+        // 3. Load Saved Persistent Settings
         UserSettings savedSettings = SettingsService.LoadSettings();
 
         // Restore Theme
@@ -110,15 +139,19 @@ public partial class MainViewModel : ObservableObject {
             }
         }
 
-        // Restore Token
+        // Restore DPAPI Protected Token
         _rememberToken = savedSettings.RememberToken;
         if (_rememberToken && !string.IsNullOrWhiteSpace(savedSettings.EncryptedToken)) {
             PersonalAccessToken = SettingsService.DecryptToken(savedSettings.EncryptedToken);
         }
 
-        // 4. Mark initialized to enable safe persistence on subsequent user changes
+        // 4. Mark initialized to enable safe persistence on subsequent changes
         _isInitialized = true;
     }
+
+    #endregion
+
+    #region Property Change Handlers
 
     partial void OnSelectedThemeChanged(ThemeDefinition value) {
         if (value != null) {
@@ -131,6 +164,7 @@ public partial class MainViewModel : ObservableObject {
         if (value != null) {
             ApplyPreset(value);
             PersistCurrentSettings();
+            DeleteCurrentPresetCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -138,58 +172,71 @@ public partial class MainViewModel : ObservableObject {
         PersistCurrentSettings();
     }
 
-    private void ApplyPreset(PackingPreset preset) {
-        ExcludedDirectoriesInput = preset.ExcludedDirectoriesText;
-        ExcludedExtensionsInput = preset.ExcludedExtensionsText;
-    }
+    #endregion
 
-    private void PersistCurrentSettings() {
-        if (!_isInitialized) {
-            return;
-        }
-
-        UserSettings settings = new UserSettings {
-            SelectedThemeId = SelectedTheme?.Id ?? "github-dark",
-            SelectedPresetName = SelectedPreset?.Name ?? string.Empty,
-            RememberToken = RememberToken,
-            EncryptedToken = RememberToken ? SettingsService.EncryptToken(PersonalAccessToken) : string.Empty
-        };
-
-        SettingsService.SaveSettings(settings);
-    }
+    #region Commands - Preset Management
 
     [RelayCommand]
     private void SaveCurrentPreset() {
-	    if (SelectedPreset == null) {
-		    return;
-	    }
+        if (SelectedPreset == null) {
+            return;
+        }
 
-	    SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
-	    SelectedPreset.ExcludedExtensionsText = ExcludedExtensionsInput.Trim();
-	    PresetService.SavePreset(SelectedPreset);
-	    string fileName = PresetService.GetValidFileName(SelectedPreset.Name) + ".json";
-	    StatusMessage = $"Saved preset '{SelectedPreset.Name}' to {fileName}";
+        SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
+        SelectedPreset.ExcludedExtensionsText = ExcludedExtensionsInput.Trim();
+        PresetService.SavePreset(SelectedPreset);
+        string fileName = PresetService.GetValidFileName(SelectedPreset.Name) + ".json";
+        StatusMessage = $"Saved preset '{SelectedPreset.Name}' to {fileName}";
     }
 
     [RelayCommand]
     private void CreateNewPreset() {
-	    string newName = $"Custom Profile {Presets.Count + 1}";
-	    PackingPreset newPreset = new PackingPreset(newName, "Custom", ExcludedDirectoriesInput.Trim(), ExcludedExtensionsInput.Trim(), isCustom: true);
-	    Presets.Add(newPreset);
-	    SelectedPreset = newPreset;
-	    PresetService.SavePreset(newPreset);
-	    string fileName = PresetService.GetValidFileName(newName) + ".json";
-	    StatusMessage = $"Created and saved '{fileName}'";
+        string newName = $"Custom Profile {Presets.Count + 1}";
+        PackingPreset newPreset = new PackingPreset(
+            newName,
+            "Custom",
+            ExcludedDirectoriesInput.Trim(),
+            ExcludedExtensionsInput.Trim(),
+            isCustom: true,
+            isDefault: false);
+
+        Presets.Add(newPreset);
+        SelectedPreset = newPreset;
+        PresetService.SavePreset(newPreset);
+        string fileName = PresetService.GetValidFileName(newName) + ".json";
+        StatusMessage = $"Created and saved '{fileName}'";
+    }
+
+    private bool CanDeleteCurrentPreset() {
+        return SelectedPreset != null && !SelectedPreset.IsDefault;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanDeleteCurrentPreset))]
+    private void DeleteCurrentPreset() {
+        if (SelectedPreset == null || SelectedPreset.IsDefault) {
+            return;
+        }
+
+        string presetNameToDelete = SelectedPreset.Name;
+        bool deleted = PresetService.DeletePreset(presetNameToDelete);
+
+        if (deleted) {
+            Presets.Remove(SelectedPreset);
+            SelectedPreset = Presets.FirstOrDefault(p => p.IsDefault)
+                             ?? Presets.FirstOrDefault()
+                             ?? new PackingPreset("Custom", "Custom", ".git", ".dll", isCustom: true, isDefault: false);
+            ApplyPreset(SelectedPreset);
+            PersistCurrentSettings();
+            StatusMessage = $"Uninstalled preset '{presetNameToDelete}'";
+        }
+        else {
+            StatusMessage = $"Unable to uninstall preset '{presetNameToDelete}'";
+        }
     }
 
     [RelayCommand]
     private void OpenPresetsFolder() {
-	    PresetService.OpenPresetsFolder();
-    }
-
-    [RelayCommand]
-    private void OpenThemesFolder() {
-        ThemeService.OpenThemesFolder();
+        PresetService.OpenPresetsFolder();
     }
 
     [RelayCommand]
@@ -234,26 +281,23 @@ public partial class MainViewModel : ObservableObject {
                 int addedCount = 0;
                 int updatedCount = 0;
 
-                // Inside the foreach loop for imported presets:
                 foreach (PackingPreset imported in importedPresets) {
-	                PackingPreset? existing = Presets.FirstOrDefault(p => p.Name.Equals(imported.Name, StringComparison.OrdinalIgnoreCase));
-	                if (existing != null) {
-		                existing.ExcludedDirectoriesText = imported.ExcludedDirectoriesText;
-		                existing.ExcludedExtensionsText = imported.ExcludedExtensionsText;
-		                existing.Language = imported.Language;
-		                existing.IsCustom = true;
-		                PresetService.SavePreset(existing);
-		                updatedCount++;
-	                }
-	                else {
-		                imported.IsCustom = true;
-		                Presets.Add(imported);
-		                PresetService.SavePreset(imported);
-		                addedCount++;
-	                }
+                    PackingPreset? existing = Presets.FirstOrDefault(p => p.Name.Equals(imported.Name, StringComparison.OrdinalIgnoreCase));
+                    if (existing != null) {
+                        existing.ExcludedDirectoriesText = imported.ExcludedDirectoriesText;
+                        existing.ExcludedExtensionsText = imported.ExcludedExtensionsText;
+                        existing.Language = imported.Language;
+                        existing.IsCustom = true;
+                        PresetService.SavePreset(existing);
+                        updatedCount++;
+                    }
+                    else {
+                        imported.IsCustom = true;
+                        Presets.Add(imported);
+                        PresetService.SavePreset(imported);
+                        addedCount++;
+                    }
                 }
-
-                PresetService.SavePresets(Presets);
 
                 PackingPreset? targetToSelect = importedPresets.LastOrDefault();
                 if (targetToSelect != null) {
@@ -266,10 +310,88 @@ public partial class MainViewModel : ObservableObject {
                 StatusMessage = $"Import complete: {addedCount} added, {updatedCount} updated.";
             }
             catch (Exception ex) {
-                StatusMessage = $"Export error: {ex.Message}";
+                StatusMessage = $"Import error: {ex.Message}";
             }
         }
     }
+
+    #endregion
+
+    #region Commands - Theme Management
+
+    [RelayCommand]
+    private void OpenThemesFolder() {
+	    ProcessStartInfo startInfo = new ProcessStartInfo {
+		    FileName = Path.Combine(
+			    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+			    "RepoPacker"),
+		    UseShellExecute = true
+	    };
+	    Process.Start(startInfo);
+    }
+
+    #endregion
+
+    #region Commands - Community Marketplace
+
+    [RelayCommand]
+    private async Task OpenMarketplaceAsync() {
+        string token = !string.IsNullOrWhiteSpace(PersonalAccessToken)
+            ? PersonalAccessToken
+            : SettingsService.DecryptToken(SettingsService.LoadSettings().EncryptedToken);
+
+        string currentPresetName = SelectedPreset?.Name ?? string.Empty;
+        string currentThemeId = SelectedTheme?.Id ?? string.Empty;
+
+        MarketplaceWindow dialog = new MarketplaceWindow(token) {
+            Owner = Application.Current.MainWindow
+        };
+
+        MarketplaceViewModel? vm = dialog.DataContext as MarketplaceViewModel;
+        if (vm != null) {
+            await vm.RefreshMarketplaceAsync();
+        }
+
+        dialog.ShowDialog();
+
+        // 1. Refresh Presets and maintain selection
+        string targetPresetName = vm?.LastInstalledPresetName ?? currentPresetName;
+        List<PackingPreset> freshPresets = PresetService.LoadPresets();
+        Presets.Clear();
+        foreach (PackingPreset preset in freshPresets) {
+            Presets.Add(preset);
+        }
+
+        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(targetPresetName, StringComparison.OrdinalIgnoreCase))
+                                       ?? Presets.FirstOrDefault(p => p.Name.Equals(currentPresetName, StringComparison.OrdinalIgnoreCase))
+                                       ?? Presets.FirstOrDefault();
+        if (matchedPreset != null) {
+            SelectedPreset = matchedPreset;
+            ApplyPreset(matchedPreset);
+        }
+
+        // 2. Refresh Themes and maintain selection
+        string targetThemeId = vm?.LastInstalledThemeId ?? currentThemeId;
+        List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
+        InstalledThemes.Clear();
+        foreach (ThemeDefinition theme in freshThemes) {
+            InstalledThemes.Add(theme);
+        }
+
+        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(targetThemeId, StringComparison.OrdinalIgnoreCase))
+                                        ?? InstalledThemes.FirstOrDefault(t => t.Id.Equals(currentThemeId, StringComparison.OrdinalIgnoreCase))
+                                        ?? InstalledThemes.FirstOrDefault();
+        if (matchedTheme != null) {
+            SelectedTheme = matchedTheme;
+            ThemeService.ApplyTheme(matchedTheme);
+        }
+
+        PersistCurrentSettings();
+    }
+
+    #endregion
+
+    #region Commands - Repository Packing Pipeline
 
     [RelayCommand]
     private void BrowseOutputFile() {
@@ -354,23 +476,6 @@ public partial class MainViewModel : ObservableObject {
         }
     }
 
-    private static HashSet<string> ParseCsvToHashSet(string csv) {
-        HashSet<string> set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(csv)) {
-            return set;
-        }
-
-        ReadOnlySpan<char> span = csv.AsSpan();
-        foreach (Range range in span.SplitAny(',', ';', '\r', '\n')) {
-            ReadOnlySpan<char> itemSpan = span[range].Trim();
-            if (!itemSpan.IsEmpty) {
-                set.Add(itemSpan.ToString());
-            }
-        }
-
-        return set;
-    }
-
     [RelayCommand]
     private void Cancel() {
         if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested) {
@@ -379,10 +484,14 @@ public partial class MainViewModel : ObservableObject {
         }
     }
 
+    #endregion
+
+    #region Internal Packing & Tokenization Helpers
+
     private int CountTokensInFile(string filePath, CancellationToken cancellationToken) {
         TiktokenTokenizer tokenizer = TokenizerInstance.Value;
         int totalTokens = 0;
-        const int bufferSize = 32768; // 32,768 chars (64 KB UTF-16), kept under 85,000 byte LOH threshold
+        const int bufferSize = 32768; // 32,768 chars = 64 KB, strictly beneath the 85 KB LOH threshold
         char[] buffer = ArrayPool<char>.Shared.Rent(bufferSize);
 
         try {
@@ -403,34 +512,46 @@ public partial class MainViewModel : ObservableObject {
         return totalTokens;
     }
 
-    [RelayCommand]
-    private async Task OpenMarketplaceAsync() {
-	    string token = !string.IsNullOrWhiteSpace(PersonalAccessToken)
-		                   ? PersonalAccessToken
-		                   : SettingsService.DecryptToken(SettingsService.LoadSettings().EncryptedToken);
+    private static HashSet<string> ParseCsvToHashSet(string csv) {
+        HashSet<string> set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(csv)) {
+            return set;
+        }
 
-	    MarketplaceWindow dialog = new MarketplaceWindow() {
-		    Owner = System.Windows.Application.Current.MainWindow
-	    };
+        ReadOnlySpan<char> span = csv.AsSpan();
+        foreach (Range range in span.SplitAny(',', ';', '\r', '\n')) {
+            ReadOnlySpan<char> itemSpan = span[range].Trim();
+            if (!itemSpan.IsEmpty) {
+                set.Add(itemSpan.ToString());
+            }
+        }
 
-	    if (dialog.DataContext is MarketplaceViewModel vm) {
-		    await vm.RefreshMarketplaceAsync();
-	    }
-
-	    dialog.ShowDialog();
-
-	    // Refresh Presets Dropdown
-	    List<PackingPreset> freshPresets = PresetService.LoadPresets();
-	    Presets.Clear();
-	    foreach (PackingPreset preset in freshPresets) {
-		    Presets.Add(preset);
-	    }
-
-	    // Refresh Themes Dropdown
-	    List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
-	    InstalledThemes.Clear();
-	    foreach (ThemeDefinition theme in freshThemes) {
-		    InstalledThemes.Add(theme);
-	    }
+        return set;
     }
+
+    #endregion
+
+    #region Settings & Persistence Helpers
+
+    private void ApplyPreset(PackingPreset preset) {
+        ExcludedDirectoriesInput = preset.ExcludedDirectoriesText;
+        ExcludedExtensionsInput = preset.ExcludedExtensionsText;
+    }
+
+    private void PersistCurrentSettings() {
+        if (!_isInitialized) {
+            return;
+        }
+
+        UserSettings settings = new UserSettings {
+            SelectedThemeId = SelectedTheme?.Id ?? "github-dark",
+            SelectedPresetName = SelectedPreset?.Name ?? string.Empty,
+            RememberToken = RememberToken,
+            EncryptedToken = RememberToken ? SettingsService.EncryptToken(PersonalAccessToken) : string.Empty
+        };
+
+        SettingsService.SaveSettings(settings);
+    }
+
+    #endregion
 }

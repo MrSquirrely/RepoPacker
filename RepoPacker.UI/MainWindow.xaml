@@ -15,10 +15,19 @@
         BorderBrush="{DynamicResource BorderBrush}"
         BorderThickness="1">
 
+    <!-- ===================================================================
+         VIEWMODEL DATA CONTEXT
+         Instantiates the primary MVVM ViewModel binding source for this window.
+         =================================================================== -->
     <Window.DataContext>
         <local:MainViewModel />
     </Window.DataContext>
 
+    <!-- ===================================================================
+         CUSTOM WINDOW CHROME
+         Removes standard OS title bar to enable custom GitHub Primer title bar styling
+         while preserving native Windows snap, resize borders, and aero shadows.
+         =================================================================== -->
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="42"
                       ResizeBorderThickness="6"
@@ -27,16 +36,19 @@
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
+    <!-- ===================================================================
+         LOCAL WINDOW RESOURCES & ELEMENT TEMPLATES
+         Shared button styles and BoolToVis are declared globally in App.xaml.
+         =================================================================== -->
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-
-        <!-- Base Text Styling -->
+        <!-- Standard text typography for labels across the window -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
             <Setter Property="FontFamily" Value="Segoe UI, -apple-system, BlinkMacSystemFont" />
             <Setter Property="FontSize" Value="13" />
         </Style>
 
+        <!-- GitHub-styled checkbox for remembering PAT tokens -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
             <Setter Property="FontSize" Value="12" />
@@ -44,7 +56,7 @@
             <Setter Property="Cursor" Value="Hand" />
         </Style>
 
-        <!-- Text Input Styling -->
+        <!-- Rounded, theme-reactive single-line TextBox style -->
         <Style TargetType="TextBox">
             <Setter Property="Height" Value="34" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -77,6 +89,7 @@
             </Setter>
         </Style>
 
+        <!-- Rounded, theme-reactive PasswordBox matching TextBox input geometry -->
         <Style TargetType="PasswordBox">
             <Setter Property="Height" Value="34" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -109,7 +122,7 @@
             </Setter>
         </Style>
 
-        <!-- ComboBoxItem -->
+        <!-- Dropdown item styling for themes and preset selectors -->
         <Style TargetType="ComboBoxItem">
             <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Padding" Value="10,8" />
@@ -139,7 +152,7 @@
             </Setter>
         </Style>
 
-        <!-- ComboBox Toggle Button -->
+        <!-- ComboBox expandable toggle button with downward chevron -->
         <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
             <Border x:Name="templateRoot"
                     Background="{DynamicResource BtnSecondaryBgBrush}"
@@ -167,7 +180,7 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
-        <!-- Reusable ComboBox Style -->
+        <!-- Reusable GitHub Primer styled ComboBox control template -->
         <Style x:Key="GitHubComboBox" TargetType="ComboBox">
             <Setter Property="Height" Value="34" />
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
@@ -223,146 +236,22 @@
         </Style>
 
         <Style TargetType="ComboBox" BasedOn="{StaticResource GitHubComboBox}" />
-
-        <!-- Buttons -->
-        <Style x:Key="GitHubSecondaryButton" TargetType="Button">
-            <Setter Property="Height" Value="36" />
-            <Setter Property="MinWidth" Value="85" />
-            <Setter Property="Padding" Value="14,0" />
-            <Setter Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="{DynamicResource BtnSecondaryHoverBrush}" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="btnBorder" Property="Opacity" Value="0.4" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="GitHubPrimaryButton" TargetType="Button">
-            <Setter Property="Height" Value="36" />
-            <Setter Property="MinWidth" Value="140" />
-            <Setter Property="Padding" Value="20,0" />
-            <Setter Property="Background" Value="#238636" />
-            <Setter Property="Foreground" Value="#FFFFFF" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="BorderBrush" Value="#2EA043" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#2EA043" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="btnBorder" Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="GitHubDangerButton" TargetType="Button">
-            <Setter Property="Height" Value="36" />
-            <Setter Property="MinWidth" Value="95" />
-            <Setter Property="Padding" Value="18,0" />
-            <Setter Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
-            <Setter Property="Foreground" Value="#F85149" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="btnBorder"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="btnBorder" Property="Background" Value="#DA3633" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
-                                <Setter TargetName="btnBorder" Property="BorderBrush" Value="#DA3633" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="TitleBarButton" TargetType="Button">
-            <Setter Property="Width" Value="46" />
-            <Setter Property="Height" Value="42" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bg" Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource TitleBtnHoverBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="TitleBarCloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#DA3633" />
-                    <Setter Property="Foreground" Value="#FFFFFF" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
     </Window.Resources>
 
+    <!-- ===================================================================
+         ROOT WINDOW LAYOUT
+         Row 0: Custom GitHub Primer Titlebar (42px)
+         Row 1: Application Form Content & Packing Actions
+         =================================================================== -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="42" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Custom Titlebar -->
+        <!-- ===============================================================
+             ROW 0: CUSTOM TITLEBAR (Chrome drag area & actions)
+             =============================================================== -->
         <Border Grid.Row="0" Background="{DynamicResource TitleBarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -371,7 +260,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Brand -->
+                <!-- Left Branding: GitHub Octocat vector logo & application title -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0">
                     <Path Data="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" 
                           Fill="{DynamicResource TextPrimaryBrush}" 
@@ -379,14 +268,24 @@
                     <TextBlock Text="GitHub Context Packer" FontWeight="SemiBold" FontSize="13" Margin="10,0,0,0" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <!-- Installed Themes Selector & Controls -->
+                <!-- Right Titlebar Controls: Marketplace, Theme Engine, and Window State Buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Palette Icon -->
+                    <!-- Marketplace Storefront Button: opens Community Presets & Themes dialog[cite: 1] -->
+                    <Button Style="{StaticResource TitleBarButton}"
+                            Command="{Binding OpenMarketplaceCommand}"
+                            ToolTip="Community Marketplace (Presets &amp; Themes)"
+                            Width="36" Height="42">
+                        <Path Data="M2.5 3A1.5 1.5 0 001 4.5V5h14v-.5A1.5 1.5 0 0013.5 3h-11zM1 6.5V13a1.5 1.5 0 001.5 1.5h11A1.5 1.5 0 0015 13V6.5H1zm4.5 2a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75zm5 0a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75z"
+                              Fill="{DynamicResource TextSecondaryBrush}"
+                              Width="15" Height="15" Stretch="Uniform" />
+                    </Button>
+
+                    <!-- Themes Palette Indicator Icon[cite: 1] -->
                     <Path Data="M8 0a8 8 0 100 16A8 8 0 008 0zm-3 8.5a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm4-3a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zm3 3a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0z"
                           Fill="{DynamicResource TextSecondaryBrush}"
-                          Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                          Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="6,0,6,0"/>
 
-                    <!-- Themes Dropdown Selector -->
+                    <!-- Installed Themes Dropdown Selector[cite: 1] -->
                     <ComboBox ItemsSource="{Binding InstalledThemes}"
                               SelectedItem="{Binding SelectedTheme}"
                               DisplayMemberPath="DisplayName"
@@ -394,16 +293,17 @@
                               Width="160" Height="28" Margin="0,0,4,0"
                               ToolTip="Installed Themes" />
 
-                    <!-- Open Themes Folder Action Button -->
+                    <!-- Open Themes Directory Button: launches File Explorer for %APPDATA%\RepoPacker\Themes\[cite: 1] -->
                     <Button Style="{StaticResource TitleBarButton}"
                             Command="{Binding OpenThemesFolderCommand}"
-                            ToolTip="Open Themes Folder to Add / Edit Themes"
+                            ToolTip="Open Appdata Folder"
                             Width="32" Height="42">
                         <Path Data="M1.75 2.5A.75.75 0 001 3.25v9.5c0 .414.336.75.75.75h12.5A.75.75 0 0015 12.75v-7.5a.75.75 0 00-.75-.75H8.38l-1.63-1.63A.75.75 0 006.22 2.5H1.75z"
                               Fill="{DynamicResource TextSecondaryBrush}"
                               Width="14" Height="14" Stretch="Uniform" />
                     </Button>
 
+                    <!-- Native Window Control Buttons: Minimize, Maximize/Restore, Close[cite: 1] -->
                     <Button Style="{StaticResource TitleBarButton}" Click="OnMinimizeClick" ToolTip="Minimize">
                         <Path Data="M0 0 H10" Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1" SnapsToDevicePixels="True"/>
                     </Button>
@@ -417,28 +317,38 @@
             </Grid>
         </Border>
 
-        <!-- Main Content -->
+        <!-- ===============================================================
+             ROW 1: MAIN REPOSITORY CONFIGURATION & ACTIONS
+             =============================================================== -->
         <Grid Grid.Row="1" Margin="28,16,28,24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <!-- 1. Repository URL[cite: 1] -->
                 <RowDefinition Height="Auto" />
+                <!-- 2. Personal Access Token[cite: 1] -->
                 <RowDefinition Height="Auto" />
+                <!-- 3. Output Destination[cite: 1] -->
                 <RowDefinition Height="Auto" />
+                <!-- 4. Language Presets Toolbar & Dropdown[cite: 1] -->
                 <RowDefinition Height="Auto" />
+                <!-- 5. Inset Filtering Rules Card[cite: 1] -->
                 <RowDefinition Height="*" />
+                <!-- 6. Execution & Cancellation Actions[cite: 1] -->
                 <RowDefinition Height="Auto" />
+                <!-- 7. Status Message & Token Count Badge[cite: 1] -->
             </Grid.RowDefinitions>
 
-            <!-- 1. Repository URL -->
+            <!-- 1. Repository HTTPS Clone URL Input[cite: 1] -->
             <StackPanel Grid.Row="0" Margin="0,0,0,12">
                 <TextBlock Text="Repository HTTPS Clone URL" Margin="0,0,0,6" FontWeight="SemiBold" />
                 <TextBox Text="{Binding RepositoryUrl, UpdateSourceTrigger=PropertyChanged}" 
                          IsEnabled="{Binding IsNotBusy}" />
             </StackPanel>
 
-            <!-- 2. Personal Access Token -->
+            <!-- 2. Personal Access Token Input & Security Settings[cite: 1] -->
             <StackPanel Grid.Row="1" Margin="0,0,0,12">
                 <TextBlock Text="GitHub Personal Access Token (PAT)" Margin="0,0,0,6" FontWeight="SemiBold" />
+                <!-- PasswordBoxHelper syncs the password securely to the ViewModel[cite: 1] -->
                 <PasswordBox local:PasswordBoxHelper.BindPassword="True"
                              local:PasswordBoxHelper.BoundPassword="{Binding PersonalAccessToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding IsNotBusy}" />
@@ -457,6 +367,7 @@
                         <Run Text="(requires 'repo' scope for private repositories)" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     </TextBlock>
 
+                    <!-- Saves encrypted token to settings.json via Windows DPAPI[cite: 1] -->
                     <CheckBox Grid.Column="1" 
                               Content="Remember token securely on this machine" 
                               IsChecked="{Binding RememberToken, Mode=TwoWay}" 
@@ -464,7 +375,7 @@
                 </Grid>
             </StackPanel>
 
-            <!-- 3. Output Digest Destination -->
+            <!-- 3. Target LLM Digest Output Destination File[cite: 1] -->
             <StackPanel Grid.Row="2" Margin="0,0,0,12">
                 <TextBlock Text="Output Digest Destination" Margin="0,0,0,6" FontWeight="SemiBold" />
                 <Grid>
@@ -484,7 +395,7 @@
                 </Grid>
             </StackPanel>
 
-            <!-- 4. Profile Preset Area with JSON Save, New, Import, Export, and JSON Edit -->
+            <!-- 4. Language Presets Toolbar & Profile Selector (Presets/ Directory)[cite: 1] -->
             <StackPanel Grid.Row="3" Margin="0,0,0,12">
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
@@ -493,29 +404,36 @@
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Grid.Column="0" 
-                               Text="Language Profile Preset (presets.json)" 
+                               Text="Language Profile Preset (Presets/*.json)" 
                                FontWeight="SemiBold" 
                                VerticalAlignment="Center" />
 
-                    <!-- Presets Toolbar -->
+                    <!-- Presets Management Toolbar -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
                         <Button Content="Save" 
                                 Command="{Binding SaveCurrentPresetCommand}" 
                                 Style="{StaticResource GitHubSecondaryButton}" 
                                 Height="26" MinWidth="52" Padding="6,0" Margin="0,0,4,0"
-                                ToolTip="Update selected preset in presets.json" />
+                                ToolTip="Update selected preset file in Presets folder" />
 
                         <Button Content="+ New" 
                                 Command="{Binding CreateNewPresetCommand}" 
                                 Style="{StaticResource GitHubSecondaryButton}" 
                                 Height="26" MinWidth="54" Padding="6,0" Margin="0,0,4,0"
-                                ToolTip="Save current exclusions as a new profile" />
+                                ToolTip="Save current exclusions as a new profile JSON file" />
+
+                        <!-- Delete Button: Uninstalls custom preset from Presets folder (disabled on default presets) -->
+                        <Button Content="Delete" 
+                                Command="{Binding DeleteCurrentPresetCommand}" 
+                                Style="{StaticResource GitHubDangerButton}" 
+                                Height="26" MinWidth="54" Padding="6,0" Margin="0,0,4,0"
+                                ToolTip="Uninstall the selected custom preset" />
 
                         <Button Content="Import" 
                                 Command="{Binding ImportPresetsCommand}" 
                                 Style="{StaticResource GitHubSecondaryButton}" 
                                 Height="26" MinWidth="56" Padding="6,0" Margin="0,0,4,0"
-                                ToolTip="Import presets bundle from an external JSON file" />
+                                ToolTip="Import presets from an external JSON file" />
 
                         <Button Content="Export" 
                                 Command="{Binding ExportPresetsCommand}" 
@@ -528,21 +446,17 @@
                                 Style="{StaticResource GitHubSecondaryButton}" 
                                 Height="26" MinWidth="95" Padding="6,0"
                                 ToolTip="Open Presets directory in File Explorer to add, edit, or share .json preset files" />
-                        <Button Content="Marketplace" 
-                                Command="{Binding OpenMarketplaceCommand}" 
-                                Style="{StaticResource GitHubPrimaryButton}" 
-                                Height="26" MinWidth="85" Padding="8,0" Margin="0,0,4,0"
-                                ToolTip="Browse and download presets and themes from GitHub Discussions" />
                     </StackPanel>
                 </Grid>
 
+                <!-- Active Preset Selector[cite: 1] -->
                 <ComboBox ItemsSource="{Binding Presets}" 
                           SelectedItem="{Binding SelectedPreset}" 
                           DisplayMemberPath="Name" 
                           IsEnabled="{Binding IsNotBusy}" />
             </StackPanel>
 
-            <!-- 5. Filtering Inset Card -->
+            <!-- 5. Filtering Inset Card (Excluded Folders, Extensions, Size Limit)[cite: 1] -->
             <Border Grid.Row="4" 
                     Background="{DynamicResource CardBrush}" 
                     BorderBrush="{DynamicResource BorderBrush}" 
@@ -557,6 +471,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
+                    <!-- Directory exclusions[cite: 1] -->
                     <StackPanel Grid.Row="0" Margin="0,0,0,10">
                         <TextBlock Text="Excluded Directories (comma-separated)" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                         <TextBox Text="{Binding ExcludedDirectoriesInput, UpdateSourceTrigger=PropertyChanged}" 
@@ -564,6 +479,7 @@
                                  Height="30" />
                     </StackPanel>
 
+                    <!-- File extensions exclusions[cite: 1] -->
                     <StackPanel Grid.Row="1" Margin="0,0,0,10">
                         <TextBlock Text="Excluded Extensions &amp; Patterns (comma-separated)" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4" />
                         <TextBox Text="{Binding ExcludedExtensionsInput, UpdateSourceTrigger=PropertyChanged}" 
@@ -571,6 +487,7 @@
                                  Height="30" />
                     </StackPanel>
 
+                    <!-- Max file size ceiling[cite: 1] -->
                     <StackPanel Grid.Row="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="Max File Size Limit:" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBox Text="{Binding MaxFileSizeKb, UpdateSourceTrigger=PropertyChanged}" 
@@ -585,19 +502,21 @@
                 </Grid>
             </Border>
 
-            <!-- Actions -->
+            <!-- 6. Execution and Cancellation Actions[cite: 1] -->
             <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,0,16">
+                <!-- Cancel button appears only when a clone or packing job is active[cite: 1] -->
                 <Button Content="Cancel" 
                         Style="{StaticResource GitHubDangerButton}"
                         Command="{Binding CancelCommand}" 
                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}"
                         Margin="0,0,12,0" />
+                <!-- Primary trigger to clone, analyze, stream pack, and count BPE tokens[cite: 1] -->
                 <Button Content="Pack Repository" 
                         Style="{StaticResource GitHubPrimaryButton}"
                         Command="{Binding PackRepositoryCommand}" />
             </StackPanel>
 
-            <!-- Status Indicator -->
+            <!-- 7. Status Indicator & Progress Bar[cite: 1] -->
             <Grid Grid.Row="6" VerticalAlignment="Bottom">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -611,6 +530,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
+                    <!-- Textual progress or completion notification[cite: 1] -->
                     <TextBlock Grid.Column="0" 
                                Text="{Binding StatusMessage}" 
                                FontSize="12" 
@@ -618,6 +538,7 @@
                                TextTrimming="CharacterEllipsis" 
                                VerticalAlignment="Center" />
 
+                    <!-- Pill badge displaying computed GPT-4o token count[cite: 1] -->
                     <Border Grid.Column="1" 
                             Background="{DynamicResource BtnSecondaryBgBrush}" 
                             BorderBrush="{DynamicResource BorderBrush}" 
@@ -632,6 +553,7 @@
                     </Border>
                 </Grid>
 
+                <!-- Thin green progress bar visible during async clone/pack pipeline[cite: 1] -->
                 <ProgressBar Grid.Row="2" 
                              Height="3" 
                              IsIndeterminate="{Binding IsIndeterminate}" 

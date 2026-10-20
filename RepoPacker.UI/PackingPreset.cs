@@ -18,14 +18,18 @@ public sealed class PackingPreset {
 	[JsonPropertyName("isCustom")]
 	public bool IsCustom { get; set; }
 
+	[JsonPropertyName("isDefault")]
+	public bool IsDefault { get; set; }
+
 	public PackingPreset() { }
 
-	public PackingPreset(string name, string language, string directories, string extensions, bool isCustom = false) {
+	public PackingPreset(string name, string language, string directories, string extensions, bool isCustom = false, bool isDefault = false) {
 		Name = name;
 		Language = language;
 		ExcludedDirectoriesText = directories;
 		ExcludedExtensionsText = extensions;
 		IsCustom = isCustom;
+		IsDefault = isDefault;
 	}
 
 	public override string ToString() => Name;

@@ -11,7 +11,41 @@
 
             <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-            <!-- GitHub Secondary Button -->
+            <!-- Titlebar System Command Buttons -->
+            <Style x:Key="TitleBarButton" TargetType="Button">
+                <Setter Property="Width" Value="46" />
+                <Setter Property="Height" Value="42" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bg" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bg" Property="Background" Value="{DynamicResource TitleBtnHoverBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="TitleBarCloseButton" TargetType="Button" BasedOn="{StaticResource TitleBarButton}">
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="#DA3633" />
+                        <Setter Property="Foreground" Value="#FFFFFF" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- GitHub Primary & Secondary Buttons -->
             <Style x:Key="GitHubSecondaryButton" TargetType="Button">
                 <Setter Property="Height" Value="36" />
                 <Setter Property="MinWidth" Value="85" />
@@ -44,7 +78,6 @@
                 </Setter>
             </Style>
 
-            <!-- GitHub Primary Button -->
             <Style x:Key="GitHubPrimaryButton" TargetType="Button">
                 <Setter Property="Height" Value="36" />
                 <Setter Property="MinWidth" Value="140" />
@@ -79,7 +112,6 @@
                 </Setter>
             </Style>
 
-            <!-- GitHub Danger Button -->
             <Style x:Key="GitHubDangerButton" TargetType="Button">
                 <Setter Property="Height" Value="36" />
                 <Setter Property="MinWidth" Value="95" />

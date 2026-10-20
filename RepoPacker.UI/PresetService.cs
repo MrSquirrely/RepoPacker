@@ -11,7 +11,29 @@ public static class PresetService {
         "RepoPacker",
         "Presets");
 
+    private static readonly HashSet<string> DefaultPresetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+        "C# - ASP.NET Core (API - Blazor)",
+        "C# - WPF - WinForms Desktop",
+        "C# - Class Library - CLI Tool",
+        "Java - Spring Boot REST API",
+        "Java - Android Application",
+        "Java - Maven - Gradle CLI",
+        "JavaScript - React - Next.js - Vite",
+        "JavaScript - Node.js Express - NestJS",
+        "JavaScript - Vue - Angular SPA",
+        "Python - FastAPI - Django - Flask",
+        "Python - Data Science and ML",
+        "Python - CLI and Library",
+        "Rust - Cargo Binary - Crate",
+        "Go - Module - Backend",
+        "Custom (User Defined)"
+    };
+
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+
+    public static bool IsDefaultPreset(string presetName) {
+        return DefaultPresetNames.Contains(presetName.Trim());
+    }
 
     public static List<PackingPreset> LoadPresets() {
         try {
@@ -34,11 +56,12 @@ public static class PresetService {
                     string json = File.ReadAllText(file);
                     PackingPreset? preset = JsonSerializer.Deserialize<PackingPreset>(json, JsonOptions);
                     if (preset != null && !string.IsNullOrWhiteSpace(preset.Name)) {
+                        preset.IsDefault = IsDefaultPreset(preset.Name);
                         loadedPresets.Add(preset);
                     }
                 }
                 catch {
-                    // Suppress and skip corrupted individual preset files
+                    // Suppress and skip corrupted preset files
                 }
             }
 
@@ -63,6 +86,7 @@ public static class PresetService {
                 Directory.CreateDirectory(PresetsDirectory);
             }
 
+            preset.IsDefault = IsDefaultPreset(preset.Name);
             string safeFileName = GetValidFileName(preset.Name) + ".json";
             string destinationPath = Path.Combine(PresetsDirectory, safeFileName);
             string json = JsonSerializer.Serialize(preset, JsonOptions);
@@ -71,6 +95,41 @@ public static class PresetService {
         catch {
             // Suppress non-critical write failures
         }
+    }
+
+    public static bool DeletePreset(string presetName) {
+        if (IsDefaultPreset(presetName)) {
+            return false;
+        }
+
+        try {
+            string safeFileName = GetValidFileName(presetName) + ".json";
+            string fullPath = Path.Combine(PresetsDirectory, safeFileName);
+            if (File.Exists(fullPath)) {
+                File.Delete(fullPath);
+                return true;
+            }
+
+            // Search files if custom preset name differs from file name
+            foreach (string file in Directory.EnumerateFiles(PresetsDirectory, "*.json")) {
+                try {
+                    string json = File.ReadAllText(file);
+                    PackingPreset? preset = JsonSerializer.Deserialize<PackingPreset>(json, JsonOptions);
+                    if (preset != null && preset.Name.Equals(presetName, StringComparison.OrdinalIgnoreCase)) {
+                        File.Delete(file);
+                        return true;
+                    }
+                }
+                catch {
+                    // Skip unreadable files
+                }
+            }
+        }
+        catch {
+            return false;
+        }
+
+        return false;
     }
 
     public static void SavePresets(IEnumerable<PackingPreset> presets) {
@@ -90,12 +149,16 @@ public static class PresetService {
         try {
             List<PackingPreset>? list = JsonSerializer.Deserialize<List<PackingPreset>>(json, JsonOptions);
             if (list is { Count: > 0 }) {
+                foreach (PackingPreset item in list) {
+                    item.IsDefault = IsDefaultPreset(item.Name);
+                }
                 return list;
             }
         }
         catch (JsonException) {
             PackingPreset? single = JsonSerializer.Deserialize<PackingPreset>(json, JsonOptions);
             if (single != null) {
+                single.IsDefault = IsDefaultPreset(single.Name);
                 return [single];
             }
         }
@@ -133,42 +196,42 @@ public static class PresetService {
         return [
             new PackingPreset("C# - ASP.NET Core (API - Blazor)", "C#",
                               "bin, obj, .vs, .vscode, TestResults, node_modules",
-                              ".dll, .pdb, .exe, .cache, .user, .suo, .log, .min.js, .min.css"),
+                              ".dll, .pdb, .exe, .cache, .user, .suo, .log, .min.js, .min.css", isCustom: false, isDefault: true),
             new PackingPreset("C# - WPF - WinForms Desktop", "C#", "bin, obj, .vs, .vscode, TestResults, x64, x86",
-                              ".dll, .pdb, .exe, .cache, .user, .suo, .baml, .g.cs"),
+                              ".dll, .pdb, .exe, .cache, .user, .suo, .baml, .g.cs", isCustom: false, isDefault: true),
             new PackingPreset("C# - Class Library - CLI Tool", "C#",
                               "bin, obj, .vs, .vscode, TestResults, BenchmarkDotNet.Artifacts",
-                              ".dll, .pdb, .exe, .cache, .user, .suo, .nupkg"),
+                              ".dll, .pdb, .exe, .cache, .user, .suo, .nupkg", isCustom: false, isDefault: true),
             new PackingPreset("Java - Spring Boot REST API", "Java",
                               "target, build, .gradle, .idea, .mvn, bin, out, logs",
-                              ".class, .jar, .war, .ear, .iml, .log, .hprof"),
+                              ".class, .jar, .war, .ear, .iml, .log, .hprof", isCustom: false, isDefault: true),
             new PackingPreset("Java - Android Application", "Java", "build, .gradle, .idea, captures, .cxx",
-                              ".apk, .aab, .dex, .class, .so, .aar, .iml"),
+                              ".apk, .aab, .dex, .class, .so, .aar, .iml", isCustom: false, isDefault: true),
             new PackingPreset("Java - Maven - Gradle CLI", "Java", "target, build, .gradle, .idea, .settings, bin",
-                              ".class, .jar, .iml, .classpath, .project, .log"),
+                              ".class, .jar, .iml, .classpath, .project, .log", isCustom: false, isDefault: true),
             new PackingPreset("JavaScript - React - Next.js - Vite", "JavaScript",
                               "node_modules, .next, dist, build, .cache, coverage",
-                              ".min.js, .min.css, .map, .tsbuildinfo, .lock, package-lock.json"),
+                              ".min.js, .min.css, .map, .tsbuildinfo, .lock, package-lock.json", isCustom: false, isDefault: true),
             new PackingPreset("JavaScript - Node.js Express - NestJS", "JavaScript",
                               "node_modules, dist, build, coverage, logs, .cache",
-                              ".map, .tsbuildinfo, .lock, .log, .sqlite, package-lock.json"),
+                              ".map, .tsbuildinfo, .lock, .log, .sqlite, package-lock.json", isCustom: false, isDefault: true),
             new PackingPreset("JavaScript - Vue - Angular SPA", "JavaScript",
                               "node_modules, dist, .angular, coverage, .cache",
-                              ".min.js, .min.css, .map, .tsbuildinfo, .lock, .log"),
+                              ".min.js, .min.css, .map, .tsbuildinfo, .lock, .log", isCustom: false, isDefault: true),
             new PackingPreset("Python - FastAPI - Django - Flask", "Python",
                               "__pycache__, .venv, venv, env, .pytest_cache, staticfiles",
-                              ".pyc, .pyo, .pyd, .sqlite3, .db, .log, poetry.lock"),
+                              ".pyc, .pyo, .pyd, .sqlite3, .db, .log, poetry.lock", isCustom: false, isDefault: true),
             new PackingPreset("Python - Data Science and ML", "Python",
                               "__pycache__, .venv, venv, .ipynb_checkpoints, runs, wandb, data",
-                              ".pyc, .pt, .pth, .onnx, .h5, .pkl, .parquet, .csv, .npy"),
+                              ".pyc, .pt, .pth, .onnx, .h5, .pkl, .parquet, .csv, .npy", isCustom: false, isDefault: true),
             new PackingPreset("Python - CLI and Library", "Python",
                               "__pycache__, .venv, venv, build, dist, *.egg-info, .pytest_cache",
-                              ".pyc, .pyo, .pyd, .whl, .egg, .log"),
+                              ".pyc, .pyo, .pyd, .whl, .egg, .log", isCustom: false, isDefault: true),
             new PackingPreset("Rust - Cargo Binary - Crate", "Rust", "target, .cargo",
-                              ".lock, .rlib, .rmeta, .pdb, Cargo.lock"),
-            new PackingPreset("Go - Module - Backend", "Go", "vendor, bin", ".exe, .test, .out, go.sum"),
+                              ".lock, .rlib, .rmeta, .pdb, Cargo.lock", isCustom: false, isDefault: true),
+            new PackingPreset("Go - Module - Backend", "Go", "vendor, bin", ".exe, .test, .out, go.sum", isCustom: false, isDefault: true),
             new PackingPreset("Custom (User Defined)", "Custom", ".git, .vs, bin, obj, node_modules",
-                              ".dll, .exe, .pdb, .bin, .zip, .png, .jpg", isCustom: true)
+                              ".dll, .exe, .pdb, .bin, .zip, .png, .jpg", isCustom: true, isDefault: true)
         ];
     }
 }

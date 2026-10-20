@@ -12,7 +12,18 @@ public static class ThemeService {
         "RepoPacker",
         "Themes");
 
+    private static readonly HashSet<string> DefaultThemeIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+        "github-dark",
+        "github-light",
+        "github-dark-dimmed",
+        "github-dark-high-contrast"
+    };
+
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+
+    public static bool IsDefaultTheme(string themeId) {
+        return DefaultThemeIds.Contains(themeId.Trim());
+    }
 
     public static List<ThemeDefinition> LoadInstalledThemes() {
         EnsureDefaultThemesExist();
@@ -25,6 +36,7 @@ public static class ThemeService {
                 string json = File.ReadAllText(file);
                 ThemeDefinition? theme = JsonSerializer.Deserialize<ThemeDefinition>(json, JsonOptions);
                 if ((theme != null) && !string.IsNullOrWhiteSpace(theme.DisplayName)) {
+                    theme.IsDefault = IsDefaultTheme(theme.Id);
                     themes.Add(theme);
                 }
             }
@@ -38,6 +50,55 @@ public static class ThemeService {
         }
 
         return themes;
+    }
+
+    public static void SaveTheme(ThemeDefinition theme) {
+        if (!Directory.Exists(ThemesDirectory)) {
+            Directory.CreateDirectory(ThemesDirectory);
+        }
+
+        theme.IsDefault = IsDefaultTheme(theme.Id);
+        string themeId = string.IsNullOrWhiteSpace(theme.Id) ? theme.DisplayName : theme.Id;
+        string safeFileName = PresetService.GetValidFileName(themeId) + ".json";
+        string filePath = Path.Combine(ThemesDirectory, safeFileName);
+        string json = JsonSerializer.Serialize(theme, JsonOptions);
+        File.WriteAllText(filePath, json);
+    }
+
+    public static bool DeleteTheme(ThemeDefinition theme) {
+        if (IsDefaultTheme(theme.Id)) {
+            return false;
+        }
+
+        try {
+            string themeId = string.IsNullOrWhiteSpace(theme.Id) ? theme.DisplayName : theme.Id;
+            string safeFileName = PresetService.GetValidFileName(themeId) + ".json";
+            string fullPath = Path.Combine(ThemesDirectory, safeFileName);
+            if (File.Exists(fullPath)) {
+                File.Delete(fullPath);
+                return true;
+            }
+
+            foreach (string file in Directory.EnumerateFiles(ThemesDirectory, "*.json")) {
+                try {
+                    string json = File.ReadAllText(file);
+                    ThemeDefinition? t = JsonSerializer.Deserialize<ThemeDefinition>(json, JsonOptions);
+                    if (t != null && (t.Id.Equals(theme.Id, StringComparison.OrdinalIgnoreCase) ||
+                                     t.DisplayName.Equals(theme.DisplayName, StringComparison.OrdinalIgnoreCase))) {
+                        File.Delete(file);
+                        return true;
+                    }
+                }
+                catch {
+                    // Skip unreadable files
+                }
+            }
+        }
+        catch {
+            return false;
+        }
+
+        return false;
     }
 
     public static void ApplyTheme(ThemeDefinition? theme) {
@@ -106,21 +167,10 @@ public static class ThemeService {
         File.WriteAllText(path, json);
     }
 
-    public static void SaveTheme(ThemeDefinition theme) {
-	    if (!Directory.Exists(ThemesDirectory)) {
-		    Directory.CreateDirectory(ThemesDirectory);
-	    }
-
-	    string themeId = string.IsNullOrWhiteSpace(theme.Id) ? theme.DisplayName : theme.Id;
-	    string safeFileName = PresetService.GetValidFileName(themeId) + ".json";
-	    string filePath = Path.Combine(ThemesDirectory, safeFileName);
-	    string json = JsonSerializer.Serialize(theme, JsonOptions);
-	    File.WriteAllText(filePath, json);
-    }
-
     private static ThemeDefinition CreateGitHubDark() => new ThemeDefinition {
         Id = "github-dark",
         DisplayName = "GitHub Dark",
+        IsDefault = true,
         CanvasColor = "#0D1117",
         CardColor = "#161B22",
         TitleBarColor = "#161B22",
@@ -138,6 +188,7 @@ public static class ThemeService {
     private static ThemeDefinition CreateGitHubLight() => new ThemeDefinition {
         Id = "github-light",
         DisplayName = "GitHub Light",
+        IsDefault = true,
         CanvasColor = "#F6F8FA",
         CardColor = "#FFFFFF",
         TitleBarColor = "#FFFFFF",
@@ -155,6 +206,7 @@ public static class ThemeService {
     private static ThemeDefinition CreateGitHubDarkDimmed() => new ThemeDefinition {
         Id = "github-dark-dimmed",
         DisplayName = "GitHub Dark Dimmed",
+        IsDefault = true,
         CanvasColor = "#22272E",
         CardColor = "#2D333B",
         TitleBarColor = "#2D333B",
@@ -172,6 +224,7 @@ public static class ThemeService {
     private static ThemeDefinition CreateGitHubHighContrast() => new ThemeDefinition {
         Id = "github-dark-high-contrast",
         DisplayName = "GitHub High Contrast",
+        IsDefault = true,
         CanvasColor = "#010409",
         CardColor = "#0D1117",
         TitleBarColor = "#0D1117",
