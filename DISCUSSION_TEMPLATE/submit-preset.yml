@@ -1,0 +1,32 @@
+name: "📦 Submit Packing Preset"
+description: "Share a custom exclusions preset for a language, framework, or toolchain"
+title: "Preset: [Language/Framework Name]"
+labels: ["preset"]
+body:
+  - type: markdown
+    attributes:
+      value: "Thank you for contributing a preset! RepoPacker will automatically parse the JSON code block below."
+  - type: textarea
+    id: description
+    attributes:
+      label: "Preset Overview"
+      description: "Briefly explain what project types this preset optimizes."
+      placeholder: "Optimized for Unreal Engine 5 C++ projects with large intermediate build folders."
+    validations:
+      required: true
+  - type: textarea
+    id: json_payload
+    attributes:
+      label: "Preset JSON"
+      description: "Provide the valid PackingPreset JSON definition."
+      render: json
+      value: |
+        {
+          "name": "Unreal Engine C++",
+          "language": "C++",
+          "excludedDirectories": "Binaries, Intermediate, Saved, DerivedDataCache",
+          "excludedExtensions": ".pdb, .exe, .dll, .obj, .log",
+          "isCustom": true
+        }
+    validations:
+      required: true
