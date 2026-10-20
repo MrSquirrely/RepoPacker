@@ -1,5 +1,3 @@
-name: "🎨 Submit UI Theme"
-description: "Share a custom color scheme matching the GitHub Primer palette"
 title: "Theme: [Theme Name]"
 labels: ["theme"]
 body:
