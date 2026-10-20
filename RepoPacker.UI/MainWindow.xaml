@@ -523,11 +523,16 @@
                                 Height="26" MinWidth="56" Padding="6,0" Margin="0,0,4,0"
                                 ToolTip="Export current presets bundle to a shareable JSON file" />
 
-                        <Button Content="Open JSON" 
+                        <Button Content="Presets Folder" 
                                 Command="{Binding OpenPresetsFolderCommand}" 
                                 Style="{StaticResource GitHubSecondaryButton}" 
-                                Height="26" MinWidth="68" Padding="6,0"
-                                ToolTip="Open presets.json in default text editor" />
+                                Height="26" MinWidth="95" Padding="6,0"
+                                ToolTip="Open Presets directory in File Explorer to add, edit, or share .json preset files" />
+                        <Button Content="Marketplace" 
+                                Command="{Binding OpenMarketplaceCommand}" 
+                                Style="{StaticResource GitHubPrimaryButton}" 
+                                Height="26" MinWidth="85" Padding="8,0" Margin="0,0,4,0"
+                                ToolTip="Browse and download presets and themes from GitHub Discussions" />
                     </StackPanel>
                 </Grid>
 

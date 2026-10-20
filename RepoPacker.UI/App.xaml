@@ -8,6 +8,108 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/DarkTheme.xaml" />
             </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+            <!-- GitHub Secondary Button -->
+            <Style x:Key="GitHubSecondaryButton" TargetType="Button">
+                <Setter Property="Height" Value="36" />
+                <Setter Property="MinWidth" Value="85" />
+                <Setter Property="Padding" Value="14,0" />
+                <Setter Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="btnBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="btnBorder" Property="Background" Value="{DynamicResource BtnSecondaryHoverBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="btnBorder" Property="Opacity" Value="0.4" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- GitHub Primary Button -->
+            <Style x:Key="GitHubPrimaryButton" TargetType="Button">
+                <Setter Property="Height" Value="36" />
+                <Setter Property="MinWidth" Value="140" />
+                <Setter Property="Padding" Value="20,0" />
+                <Setter Property="Background" Value="#238636" />
+                <Setter Property="Foreground" Value="#FFFFFF" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="BorderBrush" Value="#2EA043" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="btnBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="btnBorder" Property="Background" Value="#2EA043" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="btnBorder" Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
+                                    <Setter TargetName="btnBorder" Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- GitHub Danger Button -->
+            <Style x:Key="GitHubDangerButton" TargetType="Button">
+                <Setter Property="Height" Value="36" />
+                <Setter Property="MinWidth" Value="95" />
+                <Setter Property="Padding" Value="18,0" />
+                <Setter Property="Background" Value="{DynamicResource BtnSecondaryBgBrush}" />
+                <Setter Property="Foreground" Value="#F85149" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="btnBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="btnBorder" Property="Background" Value="#DA3633" />
+                                    <Setter Property="Foreground" Value="#FFFFFF" />
+                                    <Setter TargetName="btnBorder" Property="BorderBrush" Value="#DA3633" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

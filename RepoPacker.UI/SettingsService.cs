@@ -18,6 +18,7 @@ public static class SettingsService {
         "RepoPacker",
         "settings.json");
 
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
     private static readonly byte[] Entropy = [.. "RepoPacker_DPAPI_Salt"u8];
 
     public static UserSettings LoadSettings() {
@@ -27,7 +28,7 @@ public static class SettingsService {
             }
 
             string json = File.ReadAllText(SettingsFilePath);
-            UserSettings? settings = JsonSerializer.Deserialize<UserSettings>(json);
+            UserSettings? settings = JsonSerializer.Deserialize<UserSettings>(json, JsonOptions);
             return settings ?? new UserSettings();
         }
         catch {
@@ -42,7 +43,7 @@ public static class SettingsService {
                 Directory.CreateDirectory(dir);
             }
 
-            string json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(settings, JsonOptions);
             File.WriteAllText(SettingsFilePath, json);
         }
         catch {

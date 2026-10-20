@@ -12,6 +12,8 @@ public static class ThemeService {
         "RepoPacker",
         "Themes");
 
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
+
     public static List<ThemeDefinition> LoadInstalledThemes() {
         EnsureDefaultThemesExist();
 
@@ -21,7 +23,7 @@ public static class ThemeService {
         foreach (string file in files) {
             try {
                 string json = File.ReadAllText(file);
-                ThemeDefinition? theme = JsonSerializer.Deserialize<ThemeDefinition>(json);
+                ThemeDefinition? theme = JsonSerializer.Deserialize<ThemeDefinition>(json, JsonOptions);
                 if ((theme != null) && !string.IsNullOrWhiteSpace(theme.DisplayName)) {
                     themes.Add(theme);
                 }
@@ -73,7 +75,9 @@ public static class ThemeService {
     private static void SetDynamicBrush(ResourceDictionary resources, string key, string hexCode) {
         try {
             Color color = (Color)ColorConverter.ConvertFromString(hexCode);
-            resources[key] = new SolidColorBrush(color);
+            SolidColorBrush brush = new SolidColorBrush(color);
+            brush.Freeze();
+            resources[key] = brush;
         }
         catch {
             // Retain existing brush if color syntax fails
@@ -85,20 +89,33 @@ public static class ThemeService {
             Directory.CreateDirectory(ThemesDirectory);
         }
 
-        WriteThemeFileIfNotExists("github-dark.json", CreateGitHubDark());
-        WriteThemeFileIfNotExists("github-light.json", CreateGitHubLight());
-        WriteThemeFileIfNotExists("github-dark-dimmed.json", CreateGitHubDarkDimmed());
-        WriteThemeFileIfNotExists("github-dark-high-contrast.json", CreateGitHubHighContrast());
+        EnsureThemeFile("github-dark.json", CreateGitHubDark);
+        EnsureThemeFile("github-light.json", CreateGitHubLight);
+        EnsureThemeFile("github-dark-dimmed.json", CreateGitHubDarkDimmed);
+        EnsureThemeFile("github-dark-high-contrast.json", CreateGitHubHighContrast);
     }
 
-    private static void WriteThemeFileIfNotExists(string fileName, ThemeDefinition theme) {
+    private static void EnsureThemeFile(string fileName, Func<ThemeDefinition> factory) {
         string path = Path.Combine(ThemesDirectory, fileName);
         if (File.Exists(path)) {
-	        return;
+            return;
         }
 
-        string json = JsonSerializer.Serialize(theme, new JsonSerializerOptions { WriteIndented = true });
+        ThemeDefinition theme = factory();
+        string json = JsonSerializer.Serialize(theme, JsonOptions);
         File.WriteAllText(path, json);
+    }
+
+    public static void SaveTheme(ThemeDefinition theme) {
+	    if (!Directory.Exists(ThemesDirectory)) {
+		    Directory.CreateDirectory(ThemesDirectory);
+	    }
+
+	    string themeId = string.IsNullOrWhiteSpace(theme.Id) ? theme.DisplayName : theme.Id;
+	    string safeFileName = PresetService.GetValidFileName(themeId) + ".json";
+	    string filePath = Path.Combine(ThemesDirectory, safeFileName);
+	    string json = JsonSerializer.Serialize(theme, JsonOptions);
+	    File.WriteAllText(filePath, json);
     }
 
     private static ThemeDefinition CreateGitHubDark() => new ThemeDefinition {

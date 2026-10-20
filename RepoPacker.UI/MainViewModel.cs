@@ -1,6 +1,8 @@
-﻿using System.Collections.ObjectModel;
+﻿using System.Buffers;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -10,6 +12,10 @@ using Microsoft.Win32;
 namespace RepoPacker.UI;
 
 public partial class MainViewModel : ObservableObject {
+    private static readonly Lazy<TiktokenTokenizer> TokenizerInstance = new Lazy<TiktokenTokenizer>(
+        () => TiktokenTokenizer.CreateForModel("gpt-4o"),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly RepoPackerService _packerService;
     private CancellationTokenSource? _cancellationTokenSource;
     private bool _isInitialized;
@@ -154,29 +160,31 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand]
     private void SaveCurrentPreset() {
-        if (SelectedPreset == null) {
-            return;
-        }
+	    if (SelectedPreset == null) {
+		    return;
+	    }
 
-        SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
-        SelectedPreset.ExcludedExtensionsText = ExcludedExtensionsInput.Trim();
-        PresetService.SavePresets(Presets);
-        StatusMessage = $"Saved preset '{SelectedPreset.Name}' to presets.json";
+	    SelectedPreset.ExcludedDirectoriesText = ExcludedDirectoriesInput.Trim();
+	    SelectedPreset.ExcludedExtensionsText = ExcludedExtensionsInput.Trim();
+	    PresetService.SavePreset(SelectedPreset);
+	    string fileName = PresetService.GetValidFileName(SelectedPreset.Name) + ".json";
+	    StatusMessage = $"Saved preset '{SelectedPreset.Name}' to {fileName}";
     }
 
     [RelayCommand]
     private void CreateNewPreset() {
-        string newName = $"Custom Profile {Presets.Count + 1}";
-        PackingPreset newPreset = new PackingPreset(newName, "Custom", ExcludedDirectoriesInput.Trim(), ExcludedExtensionsInput.Trim(), isCustom: true);
-        Presets.Add(newPreset);
-        SelectedPreset = newPreset;
-        PresetService.SavePresets(Presets);
-        StatusMessage = $"Created and saved '{newName}' to presets.json";
+	    string newName = $"Custom Profile {Presets.Count + 1}";
+	    PackingPreset newPreset = new PackingPreset(newName, "Custom", ExcludedDirectoriesInput.Trim(), ExcludedExtensionsInput.Trim(), isCustom: true);
+	    Presets.Add(newPreset);
+	    SelectedPreset = newPreset;
+	    PresetService.SavePreset(newPreset);
+	    string fileName = PresetService.GetValidFileName(newName) + ".json";
+	    StatusMessage = $"Created and saved '{fileName}'";
     }
 
     [RelayCommand]
     private void OpenPresetsFolder() {
-        PresetService.OpenPresetsFile();
+	    PresetService.OpenPresetsFolder();
     }
 
     [RelayCommand]
@@ -226,20 +234,23 @@ public partial class MainViewModel : ObservableObject {
                 int addedCount = 0;
                 int updatedCount = 0;
 
+                // Inside the foreach loop for imported presets:
                 foreach (PackingPreset imported in importedPresets) {
-                    PackingPreset? existing = Presets.FirstOrDefault(p => p.Name.Equals(imported.Name, StringComparison.OrdinalIgnoreCase));
-                    if (existing != null) {
-                        existing.ExcludedDirectoriesText = imported.ExcludedDirectoriesText;
-                        existing.ExcludedExtensionsText = imported.ExcludedExtensionsText;
-                        existing.Language = imported.Language;
-                        existing.IsCustom = true;
-                        updatedCount++;
-                    }
-                    else {
-                        imported.IsCustom = true;
-                        Presets.Add(imported);
-                        addedCount++;
-                    }
+	                PackingPreset? existing = Presets.FirstOrDefault(p => p.Name.Equals(imported.Name, StringComparison.OrdinalIgnoreCase));
+	                if (existing != null) {
+		                existing.ExcludedDirectoriesText = imported.ExcludedDirectoriesText;
+		                existing.ExcludedExtensionsText = imported.ExcludedExtensionsText;
+		                existing.Language = imported.Language;
+		                existing.IsCustom = true;
+		                PresetService.SavePreset(existing);
+		                updatedCount++;
+	                }
+	                else {
+		                imported.IsCustom = true;
+		                Presets.Add(imported);
+		                PresetService.SavePreset(imported);
+		                addedCount++;
+	                }
                 }
 
                 PresetService.SavePresets(Presets);
@@ -255,7 +266,7 @@ public partial class MainViewModel : ObservableObject {
                 StatusMessage = $"Import complete: {addedCount} added, {updatedCount} updated.";
             }
             catch (Exception ex) {
-                StatusMessage = $"Import error: {ex.Message}";
+                StatusMessage = $"Export error: {ex.Message}";
             }
         }
     }
@@ -343,17 +354,17 @@ public partial class MainViewModel : ObservableObject {
         }
     }
 
-    private HashSet<string> ParseCsvToHashSet(string csv) {
+    private static HashSet<string> ParseCsvToHashSet(string csv) {
         HashSet<string> set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (string.IsNullOrWhiteSpace(csv)) {
             return set;
         }
 
-        string[] items = csv.Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (string rawItem in items) {
-            string trimmed = rawItem.Trim();
-            if (!string.IsNullOrEmpty(trimmed)) {
-                set.Add(trimmed);
+        ReadOnlySpan<char> span = csv.AsSpan();
+        foreach (Range range in span.SplitAny(',', ';', '\r', '\n')) {
+            ReadOnlySpan<char> itemSpan = span[range].Trim();
+            if (!itemSpan.IsEmpty) {
+                set.Add(itemSpan.ToString());
             }
         }
 
@@ -369,21 +380,57 @@ public partial class MainViewModel : ObservableObject {
     }
 
     private int CountTokensInFile(string filePath, CancellationToken cancellationToken) {
-        TiktokenTokenizer tokenizer = TiktokenTokenizer.CreateForModel("gpt-4o");
+        TiktokenTokenizer tokenizer = TokenizerInstance.Value;
         int totalTokens = 0;
-        const int bufferSize = 65536;
-        char[] buffer = new char[bufferSize];
+        const int bufferSize = 32768; // 32,768 chars (64 KB UTF-16), kept under 85,000 byte LOH threshold
+        char[] buffer = ArrayPool<char>.Shared.Rent(bufferSize);
 
-        using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-        using (StreamReader reader = new StreamReader(fileStream, Encoding.UTF8)) {
-            int charsRead;
-            while ((charsRead = reader.Read(buffer, 0, buffer.Length)) > 0) {
-                cancellationToken.ThrowIfCancellationRequested();
-                ReadOnlySpan<char> chunkSpan = new ReadOnlySpan<char>(buffer, 0, charsRead);
-                totalTokens += tokenizer.CountTokens(chunkSpan);
+        try {
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan))
+            using (StreamReader reader = new StreamReader(fileStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 4096)) {
+                int charsRead;
+                while ((charsRead = reader.Read(buffer, 0, bufferSize)) > 0) {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ReadOnlySpan<char> chunkSpan = new ReadOnlySpan<char>(buffer, 0, charsRead);
+                    totalTokens += tokenizer.CountTokens(chunkSpan);
+                }
             }
+        }
+        finally {
+            ArrayPool<char>.Shared.Return(buffer);
         }
 
         return totalTokens;
+    }
+
+    [RelayCommand]
+    private async Task OpenMarketplaceAsync() {
+	    string token = !string.IsNullOrWhiteSpace(PersonalAccessToken)
+		                   ? PersonalAccessToken
+		                   : SettingsService.DecryptToken(SettingsService.LoadSettings().EncryptedToken);
+
+	    MarketplaceWindow dialog = new MarketplaceWindow() {
+		    Owner = System.Windows.Application.Current.MainWindow
+	    };
+
+	    if (dialog.DataContext is MarketplaceViewModel vm) {
+		    await vm.RefreshMarketplaceAsync();
+	    }
+
+	    dialog.ShowDialog();
+
+	    // Refresh Presets Dropdown
+	    List<PackingPreset> freshPresets = PresetService.LoadPresets();
+	    Presets.Clear();
+	    foreach (PackingPreset preset in freshPresets) {
+		    Presets.Add(preset);
+	    }
+
+	    // Refresh Themes Dropdown
+	    List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
+	    InstalledThemes.Clear();
+	    foreach (ThemeDefinition theme in freshThemes) {
+		    InstalledThemes.Add(theme);
+	    }
     }
 }

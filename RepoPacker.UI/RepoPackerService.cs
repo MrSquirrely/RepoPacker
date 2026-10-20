@@ -1,5 +1,7 @@
-﻿using System.IO;
+﻿using System.Buffers;
+using System.IO;
 using System.Text;
+
 using LibGit2Sharp;
 
 namespace RepoPacker.UI;
@@ -21,9 +23,9 @@ public sealed class RepoPackerService {
             await Task.Run(() => GitCloner.CloneRepository(repoUrl, tempDirectory, token), cancellationToken);
 
             progress.Report("Analyzing repository structure with preset filters & size limits...");
-            List<string> textFilePaths = [];
+            List<string> textFilePaths = new List<string>(capacity: 512);
 
-            using (Repository repository = new(tempDirectory)) {
+            using (Repository repository = new Repository(tempDirectory)) {
                 CollectValidFiles(tempDirectory, tempDirectory, repository, excludedDirs, excludedExts, maxFileSizeBytes, textFilePaths);
             }
 
@@ -45,32 +47,52 @@ public sealed class RepoPackerService {
         HashSet<string> excludedExts,
         long maxFileSizeBytes,
         List<string> collectedFiles) {
-        DirectoryInfo directoryInfo = new(currentDirectory);
 
-        if (excludedDirs.Contains(directoryInfo.Name)) {
-            return;
+        foreach (string fullFilePath in Directory.EnumerateFiles(currentDirectory)) {
+            string fileName = Path.GetFileName(fullFilePath);
+            string extension = Path.GetExtension(fullFilePath);
+
+            // Fast filter without file system metadata reads or relative path allocation
+            if (excludedExts.Contains(extension) || excludedExts.Contains(fileName)) {
+                continue;
+            }
+
+            if (maxFileSizeBytes > 0) {
+                FileInfo fileInfo = new FileInfo(fullFilePath);
+                if (fileInfo.Length > maxFileSizeBytes) {
+                    continue;
+                }
+            }
+
+            string relativePath = Path.GetRelativePath(rootDirectory, fullFilePath);
+            if (repository.Ignore.IsPathIgnored(relativePath)) {
+                continue;
+            }
+
+            if (IsBinaryFile(fullFilePath)) {
+                continue;
+            }
+
+            collectedFiles.Add(relativePath);
         }
 
-        collectedFiles.AddRange(from fileInfo in directoryInfo.GetFiles() where (maxFileSizeBytes <= 0) || (fileInfo.Length <= maxFileSizeBytes) where !excludedExts.Contains(fileInfo.Extension) && !excludedExts.Contains(fileInfo.Name) let relativePath = Path.GetRelativePath(rootDirectory, fileInfo.FullName) where !repository.Ignore.IsPathIgnored(relativePath) where !IsBinaryFile(fileInfo.FullName) select relativePath);
+        foreach (string subDirectory in Directory.EnumerateDirectories(currentDirectory)) {
+            string dirName = Path.GetFileName(subDirectory);
+            if (excludedDirs.Contains(dirName)) {
+                continue;
+            }
 
-        foreach (DirectoryInfo subDirectory in directoryInfo.GetDirectories()) {
-            CollectValidFiles(rootDirectory, subDirectory.FullName, repository, excludedDirs, excludedExts, maxFileSizeBytes, collectedFiles);
+            CollectValidFiles(rootDirectory, subDirectory, repository, excludedDirs, excludedExts, maxFileSizeBytes, collectedFiles);
         }
     }
 
     private static bool IsBinaryFile(string filePath) {
         const int sampleSize = 1024;
-        byte[] buffer = new byte[sampleSize];
+        Span<byte> buffer = stackalloc byte[sampleSize];
 
-        using FileStream stream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        int bytesRead = stream.Read(buffer, 0, sampleSize);
-        for (int i = 0; i < bytesRead; i++) {
-	        if (buffer[i] == 0x00) {
-		        return true;
-	        }
-        }
-
-        return false;
+        using FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, sampleSize, FileOptions.SequentialScan);
+        int bytesRead = stream.Read(buffer);
+        return buffer.Slice(0, bytesRead).Contains((byte)0x00);
     }
 
     private static async Task BuildOutputDigestAsync(
@@ -79,34 +101,56 @@ public sealed class RepoPackerService {
         string repoUrl,
         string outputFilePath,
         CancellationToken cancellationToken) {
-	    await using FileStream fileStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
-	    await using StreamWriter writer = new StreamWriter(fileStream, Encoding.UTF8);
-	    await writer.WriteLineAsync("<repository>");
-	    await writer.WriteLineAsync("  <metadata>");
-	    await writer.WriteLineAsync($"    <url>{repoUrl}</url>");
-	    await writer.WriteLineAsync($"    <generated_at>{DateTime.UtcNow:O}</generated_at>");
-	    await writer.WriteLineAsync($"    <file_count>{relativeFilePaths.Count}</file_count>");
-	    await writer.WriteLineAsync("  </metadata>");
 
-	    await writer.WriteLineAsync("  <directory_structure>");
-	    foreach (string path in relativeFilePaths.OrderBy(p => p)) {
-		    await writer.WriteLineAsync($"    {path}");
-	    }
-	    await writer.WriteLineAsync("  </directory_structure>");
+        relativeFilePaths.Sort(StringComparer.Ordinal);
 
-	    await writer.WriteLineAsync("  <files>");
-	    foreach (string relativePath in relativeFilePaths) {
-		    cancellationToken.ThrowIfCancellationRequested();
+        await using FileStream fileStream = new FileStream(outputFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using StreamWriter writer = new StreamWriter(fileStream, Encoding.UTF8, bufferSize: 65536);
 
-		    string fullPath = Path.Combine(rootDirectory, relativePath);
-		    string fileContent = await File.ReadAllTextAsync(fullPath, cancellationToken);
+        await writer.WriteLineAsync("<repository>");
+        await writer.WriteLineAsync("  <metadata>");
+        await writer.WriteLineAsync($"    <url>{repoUrl}</url>");
+        await writer.WriteLineAsync($"    <generated_at>{DateTime.UtcNow:O}</generated_at>");
+        await writer.WriteLineAsync($"    <file_count>{relativeFilePaths.Count}</file_count>");
+        await writer.WriteLineAsync("  </metadata>");
 
-		    await writer.WriteLineAsync($"    <file path=\"{relativePath}\">");
-		    await writer.WriteLineAsync(fileContent);
-		    await writer.WriteLineAsync("    </file>");
-	    }
-	    await writer.WriteLineAsync("  </files>");
-	    await writer.WriteLineAsync("</repository>");
+        await writer.WriteLineAsync("  <directory_structure>");
+        foreach (string path in relativeFilePaths) {
+            await writer.WriteAsync("    ");
+            await writer.WriteLineAsync(path);
+        }
+        await writer.WriteLineAsync("  </directory_structure>");
+
+        await writer.WriteLineAsync("  <files>");
+        char[] chunkBuffer = ArrayPool<char>.Shared.Rent(16384);
+        try {
+            foreach (string relativePath in relativeFilePaths) {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                string fullPath = Path.Combine(rootDirectory, relativePath);
+
+                await writer.WriteAsync("    <file path=\"");
+                await writer.WriteAsync(relativePath);
+                await writer.WriteLineAsync("\">");
+
+                using (FileStream inputStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan))
+                using (StreamReader reader = new StreamReader(inputStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 4096)) {
+                    int charsRead;
+                    while ((charsRead = await reader.ReadAsync(chunkBuffer.AsMemory(0, chunkBuffer.Length), cancellationToken)) > 0) {
+                        await writer.WriteAsync(chunkBuffer.AsMemory(0, charsRead), cancellationToken);
+                    }
+                }
+
+                await writer.WriteLineAsync();
+                await writer.WriteLineAsync("    </file>");
+            }
+        }
+        finally {
+            ArrayPool<char>.Shared.Return(chunkBuffer);
+        }
+
+        await writer.WriteLineAsync("  </files>");
+        await writer.WriteLineAsync("</repository>");
     }
 
     private static void DeleteDirectorySafe(string directoryPath) {
@@ -114,7 +158,7 @@ public sealed class RepoPackerService {
             return;
         }
 
-        foreach (string file in Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories)) {
+        foreach (string file in Directory.EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories)) {
             File.SetAttributes(file, FileAttributes.Normal);
         }
 
