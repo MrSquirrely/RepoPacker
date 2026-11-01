@@ -358,39 +358,34 @@ public partial class MainViewModel : ObservableObject {
             Owner = Application.Current.MainWindow
         };
 
-        MarketplaceViewModel? vm = dialog.DataContext as MarketplaceViewModel;
-        if (vm != null) {
+        if (dialog.DataContext is MarketplaceViewModel vm) {
             await vm.RefreshMarketplaceAsync();
         }
 
         dialog.ShowDialog();
 
-        // 1. Refresh Presets and maintain selection
-        string targetPresetName = vm?.LastInstalledPresetName ?? currentPresetName;
+        // 1. Refresh Presets and preserve the currently selected preset
         List<PackingPreset> freshPresets = PresetService.LoadPresets();
         Presets.Clear();
         foreach (PackingPreset preset in freshPresets) {
             Presets.Add(preset);
         }
 
-        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(targetPresetName, StringComparison.OrdinalIgnoreCase))
-                                       ?? Presets.FirstOrDefault(p => p.Name.Equals(currentPresetName, StringComparison.OrdinalIgnoreCase))
+        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(currentPresetName, StringComparison.OrdinalIgnoreCase))
                                        ?? Presets.FirstOrDefault();
         if (matchedPreset != null) {
             SelectedPreset = matchedPreset;
             ApplyPreset(matchedPreset);
         }
 
-        // 2. Refresh Themes and maintain selection
-        string targetThemeId = vm?.LastInstalledThemeId ?? currentThemeId;
+        // 2. Refresh Themes and preserve the currently selected theme
         List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
         InstalledThemes.Clear();
         foreach (ThemeDefinition theme in freshThemes) {
             InstalledThemes.Add(theme);
         }
 
-        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(targetThemeId, StringComparison.OrdinalIgnoreCase))
-                                        ?? InstalledThemes.FirstOrDefault(t => t.Id.Equals(currentThemeId, StringComparison.OrdinalIgnoreCase))
+        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(currentThemeId, StringComparison.OrdinalIgnoreCase))
                                         ?? InstalledThemes.FirstOrDefault();
         if (matchedTheme != null) {
             SelectedTheme = matchedTheme;
