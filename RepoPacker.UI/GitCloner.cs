@@ -3,7 +3,7 @@
 namespace RepoPacker.UI;
 
 public static class GitCloner {
-    public static void CloneRepository(string repositoryUrl, string targetDirectory, string personalAccessToken) {
+    public static void CloneRepository(string repositoryUrl, string targetDirectory, string personalAccessToken, CancellationToken cancellationToken) {
         CloneOptions cloneOptions = new() {
             Checkout = true,
             RecurseSubmodules = false,
@@ -13,10 +13,20 @@ public static class GitCloner {
                     new UsernamePasswordCredentials {
                         Username = "git",
                         Password = personalAccessToken
-                    }
+                    },
+                // Returning false from a progress callback makes libgit2 abort the fetch
+                OnProgress = _ => !cancellationToken.IsCancellationRequested,
+                OnTransferProgress = _ => !cancellationToken.IsCancellationRequested
             }
         };
 
-        Repository.Clone(repositoryUrl, targetDirectory, cloneOptions);
+        try {
+            Repository.Clone(repositoryUrl, targetDirectory, cloneOptions);
+        }
+        catch (LibGit2SharpException) when (cancellationToken.IsCancellationRequested) {
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 }

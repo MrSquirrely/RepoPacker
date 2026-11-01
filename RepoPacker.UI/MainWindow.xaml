@@ -8,7 +8,7 @@
         mc:Ignorable="d"
         Title="GitHub Context Packer"
         Height="780" Width="780"
-        MinHeight="700" MinWidth="650"
+        MinHeight="720" MinWidth="650"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource CanvasBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}"
@@ -522,9 +522,53 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="8" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
+                <!-- Target model selector and context window utilization meter -->
                 <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Target Model:"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
+
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding BudgetProfiles}"
+                              SelectedItem="{Binding SelectedBudgetProfile}"
+                              DisplayMemberPath="DisplayName"
+                              IsEnabled="{Binding IsNotBusy}"
+                              Width="220" Height="28"
+                              ToolTip="Sets the context window and tokenizer. Non-OpenAI models are estimated with an OpenAI tokenizer." />
+
+                    <StackPanel Grid.Column="2"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding HasContextUtilization, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding ContextUtilizationDisplay}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="0,0,0,3" />
+                        <ProgressBar Height="6"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="{Binding ContextUtilizationPercentage, Mode=OneWay}"
+                                     Foreground="{Binding ContextUtilizationColor}"
+                                     Background="{DynamicResource BtnSecondaryBgBrush}"
+                                     BorderThickness="0" />
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -554,8 +598,8 @@
                 </Grid>
 
                 <!-- Thin green progress bar visible during async clone/pack pipeline[cite: 1] -->
-                <ProgressBar Grid.Row="2" 
-                             Height="3" 
+                <ProgressBar Grid.Row="4"
+                             Height="3"
                              IsIndeterminate="{Binding IsIndeterminate}" 
                              Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" 
                              Foreground="#2EA043" 

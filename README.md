@@ -28,6 +28,7 @@ Every component of this repository—from the low-level Git traversal engine to 
 - **Hardware-Level Token Security (Windows DPAPI):** When saving a PAT, tokens are encrypted with `ProtectedData.Protect` using `DataProtectionScope.CurrentUser`. Your secret key is tied strictly to your Windows login identity and cannot be extracted from other machines or user accounts.
 - **Shallow Local Ingestion (Depth = 1):** Powered by `LibGit2Sharp`. The tool executes a shallow single-commit clone to an isolated temporary directory, cleanly bypassing GitHub REST API rate limits and handling submodules natively.
 - **Fast In-Memory BPE Token Estimation:** Streams the output digest through `Microsoft.ML.Tokenizers` using the `gpt-4o` (`o200k_base`) tokenizer in 64 KB memory chunks, providing an immediate token count upon completion.
+- **Context Window Budgeting:** Pick a target model to see how much of its context window the digest uses, with a meter that turns amber at 60% and red above 85%. OpenAI models are counted with their own tokenizer (`o200k_base` or `cl100k_base`); other models are estimated with `o200k_base`.
 - **Extensible JSON Preset System:** Switch between project types (C# ASP.NET Core, WPF Desktop, Java Spring Boot, Node.js, Python FastAPI/PyTorch, Rust, Go, etc.) or create, import, and export custom filter configurations to share across your engineering team.
 - **File Size Thresholds & Binary Filtering:** Skips binary files using null-byte stream detection and enforces strict file size caps (e.g., skip files over 500 KB) to prevent context inflation.
 - **JSON Theme Engine:** Features an authentic GitHub Primer Dark/Light aesthetic built on WPF's native `WindowChrome` with custom titlebar window snapping, supporting hot-reloadable custom theme files stored in `%APPDATA%\RepoPacker\Themes\`.
@@ -54,7 +55,7 @@ Rather than wrapping code in ambiguous Markdown triple backticks (which frequent
 
   <files>
     <file path="src/Core/Engine.cs">
-      // Clean, uncorrupted source code
+<![CDATA[// Clean, uncorrupted source code]]>
     </file>
   </files>
 </repository>

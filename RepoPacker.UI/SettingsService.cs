@@ -8,6 +8,7 @@ namespace RepoPacker.UI;
 public sealed class UserSettings {
     public string SelectedThemeId { get; set; } = "github-dark";
     public string SelectedPresetName { get; set; } = string.Empty;
+    public string SelectedBudgetProfileName { get; set; } = string.Empty;
     public bool RememberToken { get; set; }
     public string EncryptedToken { get; set; } = string.Empty;
 }

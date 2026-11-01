@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -21,17 +22,41 @@ namespace RepoPacker.UI;
 public partial class MainViewModel : ObservableObject {
     #region Fields & Dependencies
 
-    private static readonly Lazy<TiktokenTokenizer> TokenizerInstance = new Lazy<TiktokenTokenizer>(
-        () => TiktokenTokenizer.CreateForModel("gpt-4o"),
-        LazyThreadSafetyMode.ExecutionAndPublication);
+    private const string UtilizationGreen = "#3FB950";
+    private const string UtilizationAmber = "#D29922";
+    private const string UtilizationRed = "#F85149";
+    private const double UtilizationAmberThreshold = 60.0;
+    private const double UtilizationRedThreshold = 85.0;
+
+    private static readonly ConcurrentDictionary<string, TiktokenTokenizer> TokenizerCache =
+	    new ConcurrentDictionary<string, TiktokenTokenizer>(StringComparer.OrdinalIgnoreCase);
 
     private readonly RepoPackerService _packerService;
+    private readonly Dictionary<string, int> _tokenCountsByModel = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     private CancellationTokenSource? _cancellationTokenSource;
+    private string? _lastOutputFilePath;
     private bool _isInitialized;
 
     #endregion
 
     #region Observable Properties - Repository & Output
+
+    public ObservableCollection<ContextBudgetProfile> BudgetProfiles { get; }
+
+    [ObservableProperty]
+    private ContextBudgetProfile _selectedBudgetProfile;
+
+    [ObservableProperty]
+    private double _contextUtilizationPercentage;
+
+    [ObservableProperty]
+    private string _contextUtilizationDisplay = string.Empty;
+
+    [ObservableProperty]
+    private string _contextUtilizationColor = UtilizationGreen;
+
+    [ObservableProperty]
+    private bool _hasContextUtilization;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
@@ -62,6 +87,7 @@ public partial class MainViewModel : ObservableObject {
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotBusy))]
+    [NotifyCanExecuteChangedFor(nameof(PackRepositoryCommand))]
     private bool _isBusy;
 
     public bool IsNotBusy => !IsBusy;
@@ -119,6 +145,29 @@ public partial class MainViewModel : ObservableObject {
         // 3. Load Saved Persistent Settings
         UserSettings savedSettings = SettingsService.LoadSettings();
 
+        List<ContextBudgetProfile> defaultProfiles = new List<ContextBudgetProfile> {
+	        new ContextBudgetProfile("GPT-4o (128k)", 128_000, "gpt-4o"),
+	        new ContextBudgetProfile("GPT-4.1 (1M)", 1_000_000, "gpt-4o"),
+	        new ContextBudgetProfile("GPT-4 Turbo (128k)", 128_000, "gpt-4"),
+	        new ContextBudgetProfile("Claude 3.5 / 3.7 Sonnet (200k)", 200_000, "gpt-4o"),
+	        new ContextBudgetProfile("o1 / o3-mini (200k)", 200_000, "gpt-4o"),
+	        new ContextBudgetProfile("DeepSeek V3 / R1 (64k)", 64_000, "gpt-4o"),
+	        new ContextBudgetProfile("Gemini 1.5 / 2.5 Flash (1M)", 1_000_000, "gpt-4o"),
+	        new ContextBudgetProfile("Llama 3.3 (128k)", 128_000, "gpt-4o")
+        };
+
+        BudgetProfiles = new ObservableCollection<ContextBudgetProfile>(defaultProfiles);
+        _selectedBudgetProfile = BudgetProfiles[0];
+
+        // Restore saved profile
+        if (!string.IsNullOrWhiteSpace(savedSettings.SelectedBudgetProfileName)) {
+	        ContextBudgetProfile? matchedProfile = BudgetProfiles.FirstOrDefault(
+		        p => p.DisplayName.Equals(savedSettings.SelectedBudgetProfileName, StringComparison.OrdinalIgnoreCase));
+	        if (matchedProfile != null) {
+		        _selectedBudgetProfile = matchedProfile;
+	        }
+        }
+
         // Restore Theme
         if (!string.IsNullOrWhiteSpace(savedSettings.SelectedThemeId)) {
             ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(
@@ -172,6 +221,13 @@ public partial class MainViewModel : ObservableObject {
         PersistCurrentSettings();
     }
 
+    partial void OnSelectedBudgetProfileChanged(ContextBudgetProfile value) {
+        if (value != null) {
+            PersistCurrentSettings();
+            _ = RefreshTokenCountForProfileAsync(value);
+        }
+    }
+
     #endregion
 
     #region Commands - Preset Management
@@ -191,7 +247,7 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand]
     private void CreateNewPreset() {
-        string newName = $"Custom Profile {Presets.Count + 1}";
+        string newName = GetNextCustomPresetName();
         PackingPreset newPreset = new PackingPreset(
             newName,
             "Custom",
@@ -205,6 +261,17 @@ public partial class MainViewModel : ObservableObject {
         PresetService.SavePreset(newPreset);
         string fileName = PresetService.GetValidFileName(newName) + ".json";
         StatusMessage = $"Created and saved '{fileName}'";
+    }
+
+    private string GetNextCustomPresetName() {
+        int number = Presets.Count + 1;
+        string candidate = $"Custom Profile {number}";
+        while (Presets.Any(p => p.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase))) {
+            number++;
+            candidate = $"Custom Profile {number}";
+        }
+
+        return candidate;
     }
 
     private bool CanDeleteCurrentPreset() {
@@ -347,39 +414,34 @@ public partial class MainViewModel : ObservableObject {
             Owner = Application.Current.MainWindow
         };
 
-        MarketplaceViewModel? vm = dialog.DataContext as MarketplaceViewModel;
-        if (vm != null) {
+        if (dialog.DataContext is MarketplaceViewModel vm) {
             await vm.RefreshMarketplaceAsync();
         }
 
         dialog.ShowDialog();
 
-        // 1. Refresh Presets and maintain selection
-        string targetPresetName = vm?.LastInstalledPresetName ?? currentPresetName;
+        // 1. Refresh Presets and preserve the currently selected preset
         List<PackingPreset> freshPresets = PresetService.LoadPresets();
         Presets.Clear();
         foreach (PackingPreset preset in freshPresets) {
             Presets.Add(preset);
         }
 
-        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(targetPresetName, StringComparison.OrdinalIgnoreCase))
-                                       ?? Presets.FirstOrDefault(p => p.Name.Equals(currentPresetName, StringComparison.OrdinalIgnoreCase))
+        PackingPreset? matchedPreset = Presets.FirstOrDefault(p => p.Name.Equals(currentPresetName, StringComparison.OrdinalIgnoreCase))
                                        ?? Presets.FirstOrDefault();
         if (matchedPreset != null) {
             SelectedPreset = matchedPreset;
             ApplyPreset(matchedPreset);
         }
 
-        // 2. Refresh Themes and maintain selection
-        string targetThemeId = vm?.LastInstalledThemeId ?? currentThemeId;
+        // 2. Refresh Themes and preserve the currently selected theme
         List<ThemeDefinition> freshThemes = ThemeService.LoadInstalledThemes();
         InstalledThemes.Clear();
         foreach (ThemeDefinition theme in freshThemes) {
             InstalledThemes.Add(theme);
         }
 
-        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(targetThemeId, StringComparison.OrdinalIgnoreCase))
-                                        ?? InstalledThemes.FirstOrDefault(t => t.Id.Equals(currentThemeId, StringComparison.OrdinalIgnoreCase))
+        ThemeDefinition? matchedTheme = InstalledThemes.FirstOrDefault(t => t.Id.Equals(currentThemeId, StringComparison.OrdinalIgnoreCase))
                                         ?? InstalledThemes.FirstOrDefault();
         if (matchedTheme != null) {
             SelectedTheme = matchedTheme;
@@ -418,8 +480,9 @@ public partial class MainViewModel : ObservableObject {
     private async Task PackRepositoryAsync() {
         IsBusy = true;
         IsIndeterminate = true;
-        TokenCount = 0;
-        TokenCountDisplay = string.Empty;
+        ClearTokenMetrics();
+        _tokenCountsByModel.Clear();
+        _lastOutputFilePath = null;
         _cancellationTokenSource = new CancellationTokenSource();
 
         if (RememberToken) {
@@ -450,23 +513,57 @@ public partial class MainViewModel : ObservableObject {
                 progressReporter,
                 _cancellationTokenSource.Token);
 
+            _lastOutputFilePath = destination;
+
             progressReporter.Report("Calculating token count...");
 
-            int calculatedTokens = await Task.Run(
-                () => CountTokensInFile(destination, _cancellationTokenSource.Token),
-                _cancellationTokenSource.Token);
+            int calculatedTokens = await GetTokenCountAsync(destination, SelectedBudgetProfile.TokenizerModel, _cancellationTokenSource.Token);
 
-            TokenCount = calculatedTokens;
-            TokenCountDisplay = $"{calculatedTokens:N0} tokens";
+            ApplyTokenCount(calculatedTokens);
             StatusMessage = $"Completed ({TokenCountDisplay}) — saved to: {Path.GetFileName(destination)}";
         }
         catch (OperationCanceledException) {
             StatusMessage = "Operation cancelled by user.";
-            TokenCountDisplay = string.Empty;
+            ClearTokenMetrics();
         }
         catch (Exception ex) {
             StatusMessage = $"Error: {ex.Message}";
-            TokenCountDisplay = string.Empty;
+            ClearTokenMetrics();
+        }
+        finally {
+            IsBusy = false;
+            IsIndeterminate = false;
+            _cancellationTokenSource?.Dispose();
+            _cancellationTokenSource = null;
+        }
+    }
+
+    private async Task RefreshTokenCountForProfileAsync(ContextBudgetProfile profile) {
+        if (_lastOutputFilePath == null) {
+            return;
+        }
+
+        if (_tokenCountsByModel.TryGetValue(profile.TokenizerModel, out int cachedTokens)) {
+            ApplyTokenCount(cachedTokens);
+            return;
+        }
+
+        IsBusy = true;
+        IsIndeterminate = true;
+        ClearTokenMetrics();
+        StatusMessage = $"Counting tokens for {profile.DisplayName}...";
+        _cancellationTokenSource = new CancellationTokenSource();
+
+        try {
+            int calculatedTokens = await GetTokenCountAsync(_lastOutputFilePath, profile.TokenizerModel, _cancellationTokenSource.Token);
+            ApplyTokenCount(calculatedTokens);
+            StatusMessage = $"Counted {TokenCountDisplay} for {profile.DisplayName}";
+        }
+        catch (OperationCanceledException) {
+            StatusMessage = "Operation cancelled by user.";
+        }
+        catch (Exception ex) {
+            StatusMessage = $"Error: {ex.Message}";
         }
         finally {
             IsBusy = false;
@@ -488,8 +585,55 @@ public partial class MainViewModel : ObservableObject {
 
     #region Internal Packing & Tokenization Helpers
 
-    private int CountTokensInFile(string filePath, CancellationToken cancellationToken) {
-        TiktokenTokenizer tokenizer = TokenizerInstance.Value;
+    private async Task<int> GetTokenCountAsync(string filePath, string tokenizerModel, CancellationToken cancellationToken) {
+        if (_tokenCountsByModel.TryGetValue(tokenizerModel, out int cachedTokens)) {
+            return cachedTokens;
+        }
+
+        int calculatedTokens = await Task.Run(
+            () => CountTokensInFile(filePath, tokenizerModel, cancellationToken),
+            cancellationToken);
+
+        _tokenCountsByModel[tokenizerModel] = calculatedTokens;
+        return calculatedTokens;
+    }
+
+    private void ApplyTokenCount(int tokenCount) {
+        TokenCount = tokenCount;
+        TokenCountDisplay = $"{tokenCount:N0} tokens";
+        UpdateContextUtilization();
+    }
+
+    private void ClearTokenMetrics() {
+        TokenCount = 0;
+        TokenCountDisplay = string.Empty;
+        UpdateContextUtilization();
+    }
+
+    private void UpdateContextUtilization() {
+        if (TokenCount <= 0 || SelectedBudgetProfile == null) {
+            HasContextUtilization = false;
+            ContextUtilizationPercentage = 0;
+            ContextUtilizationDisplay = string.Empty;
+            ContextUtilizationColor = UtilizationGreen;
+            return;
+        }
+
+        int maxTokens = SelectedBudgetProfile.MaxTokens;
+        double percentage = TokenCount * 100.0 / maxTokens;
+
+        ContextUtilizationPercentage = percentage;
+        ContextUtilizationDisplay = $"{TokenCount:N0} / {maxTokens:N0} tokens ({percentage:F1}%)";
+        ContextUtilizationColor = percentage > UtilizationRedThreshold
+            ? UtilizationRed
+            : percentage >= UtilizationAmberThreshold
+                ? UtilizationAmber
+                : UtilizationGreen;
+        HasContextUtilization = true;
+    }
+
+    private static int CountTokensInFile(string filePath, string tokenizerModel, CancellationToken cancellationToken) {
+        TiktokenTokenizer tokenizer = TokenizerCache.GetOrAdd(tokenizerModel, static model => TiktokenTokenizer.CreateForModel(model));
         int totalTokens = 0;
         const int bufferSize = 32768; // 32,768 chars = 64 KB, strictly beneath the 85 KB LOH threshold
         char[] buffer = ArrayPool<char>.Shared.Rent(bufferSize);
@@ -546,6 +690,7 @@ public partial class MainViewModel : ObservableObject {
         UserSettings settings = new UserSettings {
             SelectedThemeId = SelectedTheme?.Id ?? "github-dark",
             SelectedPresetName = SelectedPreset?.Name ?? string.Empty,
+            SelectedBudgetProfileName = SelectedBudgetProfile?.DisplayName ?? string.Empty,
             RememberToken = RememberToken,
             EncryptedToken = RememberToken ? SettingsService.EncryptToken(PersonalAccessToken) : string.Empty
         };
