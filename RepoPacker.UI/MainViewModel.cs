@@ -191,7 +191,7 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand]
     private void CreateNewPreset() {
-        string newName = $"Custom Profile {Presets.Count + 1}";
+        string newName = GetNextCustomPresetName();
         PackingPreset newPreset = new PackingPreset(
             newName,
             "Custom",
@@ -205,6 +205,17 @@ public partial class MainViewModel : ObservableObject {
         PresetService.SavePreset(newPreset);
         string fileName = PresetService.GetValidFileName(newName) + ".json";
         StatusMessage = $"Created and saved '{fileName}'";
+    }
+
+    private string GetNextCustomPresetName() {
+        int number = Presets.Count + 1;
+        string candidate = $"Custom Profile {number}";
+        while (Presets.Any(p => p.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase))) {
+            number++;
+            candidate = $"Custom Profile {number}";
+        }
+
+        return candidate;
     }
 
     private bool CanDeleteCurrentPreset() {

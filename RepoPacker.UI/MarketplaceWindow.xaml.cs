@@ -26,9 +26,6 @@ public partial class MarketplaceWindow : Window {
 			case WindowState.Maximized:
 				SystemCommands.RestoreWindow(this);
 				break;
-			case WindowState.Normal:
-			case WindowState.Minimized:
-				break;
 			default:
 				SystemCommands.MaximizeWindow(this);
 				break;

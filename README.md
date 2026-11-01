@@ -54,7 +54,7 @@ Rather than wrapping code in ambiguous Markdown triple backticks (which frequent
 
   <files>
     <file path="src/Core/Engine.cs">
-      // Clean, uncorrupted source code
+<![CDATA[// Clean, uncorrupted source code]]>
     </file>
   </files>
 </repository>
